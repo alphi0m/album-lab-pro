@@ -1,0 +1,60 @@
+# ==========================================
+# Compilazioni, Eseguibili e Pacchetti Standalone
+# (Evita che chiunque possa scaricare l'app già pronta)
+# ==========================================
+dist/
+build/
+*.dmg
+*.pkg
+*.exe
+*.app/
+*.msi
+*.zip
+*.tar.gz
+
+# ==========================================
+# Ambienti Virtuali e Dipendenze
+# ==========================================
+venv/
+.venv/
+env/
+ENV/
+node_modules/
+
+# ==========================================
+# Bytecode e Cache Python
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# ==========================================
+# Dati Ordini e Runtime Locale
+# ==========================================
+archivio_ordini/
+server_data/orders/
+config.json
+*.sqlite3
+*.log
+
+# ==========================================
+# Backup e File Legacy Archiviati
+# ==========================================
+_legacy/
+
+# ==========================================
+# Sistema Operativo e IDE
+# ==========================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
