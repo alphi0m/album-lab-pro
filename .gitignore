@@ -37,6 +37,7 @@ archivio_ordini/
 server_data/orders/
 config.json
 LINK_PER_I_FOTOGRAFI.txt
+INDIRIZZO_SERVER_PER_FOTOGRAFI.txt
 tools/
 *.sqlite3
 *.log

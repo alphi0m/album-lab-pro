@@ -79,7 +79,7 @@ Nel settore dei laboratori fotografici e della legatoria artigianale di album ma
 - **Sanitizzazione Cross-Platform:** Normalizzazione regex dei numeri di busta e dei metadati per evitare caratteri illegali nei filesystem (`/`, `\`, `:`, `*`, `?`), prevenendo errori su Windows e macOS.
 
 ### 5. Connettività Zero-Config con Cloudflare Tunnel
-- **Avvio 1-Click per il Laboratorio:** Tramite gli script a doppio clic `avvia_laboratorio.command` (macOS) e `avvia_laboratorio.bat` (Windows), il sistema avvia il server, scarica automaticamente il client ufficiale Cloudflare se assente, attiva un tunnel HTTPS cifrato e salva il link pubblico in `LINK_PER_I_FOTOGRAFI.txt`, aprendo direttamente la dashboard nel browser.
+- **Avvio 1-Click per il Laboratorio:** Tramite gli script a doppio clic `avvia_laboratorio.command` (macOS) e `avvia_laboratorio.bat` (Windows), il sistema avvia il server, scarica automaticamente il client ufficiale Cloudflare se assente, attiva un tunnel HTTPS cifrato, salva l'indirizzo server in `INDIRIZZO_SERVER_PER_FOTOGRAFI.txt` e apre direttamente la dashboard nel browser del laboratorio (il fotografo non usa il browser, usa esclusivamente l'app desktop!).
 
 ### 6. Interfaccia Grafica Dark Studio HiDPI / Retina
 - Palette cromatica professionale (`#121316`, `#18191C`, `#0078FF`) studiata per evitare l'affaticamento visivo e non alterare la percezione dei colori fotografici.
@@ -165,7 +165,7 @@ Basta fare doppio clic sull'avviatore rapido:
 * **Su Mac:** doppio clic su `avvia_laboratorio.command`
 * **Su Windows:** doppio clic su `avvia_laboratorio.bat`
 
-Il programma avvia il server, crea il tunnel Internet, apre la Dashboard nel browser su **`http://localhost:5050/admin`** e genera il file **`LINK_PER_I_FOTOGRAFI.txt`** contenente l'indirizzo pubblico da inoltrare ai fotografi!
+Il programma avvia il server, crea il tunnel Internet, apre la Dashboard nel browser del laboratorio su **`http://localhost:5050/admin`** e genera il file **`INDIRIZZO_SERVER_PER_FOTOGRAFI.txt`** contenente l'indirizzo da inserire una sola volta nell'app desktop del fotografo (il fotografo non deve aprire il browser, lavora al 100% all'interno dell'app nativa!).
 
 ### 2. Per il Fotografo (Composizione & Invio Commessa)
 

@@ -135,23 +135,23 @@ def main():
     print("=" * 72)
 
     if public_url:
-        print("\n👉 LINK DA INVIARE AI FOTOGRAFI (CLIENTI):")
+        print("\n👉 INDIRIZZO SERVER PER L'APP DEI FOTOGRAFI:")
         print(f"   \033[1;32m{public_url}\033[0m")
-        print("   (Copia e invia questo link via WhatsApp/Email ai fotografi)")
+        print("   (Questo indirizzo serve all'app desktop del fotografo per sapere dove inviare i file)")
 
         # Salva su file TXT per comodità
-        link_file = BASE_DIR / "LINK_PER_I_FOTOGRAFI.txt"
+        link_file = BASE_DIR / "INDIRIZZO_SERVER_PER_FOTOGRAFI.txt"
         with open(link_file, "w", encoding="utf-8") as f:
             f.write(
-                f"INDIRIZZO SERVER LABORATORIO ALBUM LAB PRO:\n\n"
+                f"INDIRIZZO SERVER LABORATORIO (ALBUM LAB PRO):\n\n"
                 f"{public_url}\n\n"
-                f"Istruzioni per il fotografo:\n"
-                f"1. Apri Album Lab Pro\n"
-                f"2. Clicca su 'Invia al Laboratorio'\n"
-                f"3. Incolla questo link nel campo 'Indirizzo Server Laboratorio'\n"
-                f"4. Clicca su 'Trasmetti Ordine Ora'\n"
+                f"Come usarlo nell'App Fotografo:\n"
+                f"1. Apri l'app desktop Album Lab Pro (non serve aprire il browser!).\n"
+                f"2. Prepara l'album e clicca sul pulsante 'Invia al Laboratorio'.\n"
+                f"3. Incolla questo indirizzo nel campo 'Indirizzo Server Laboratorio' (l'app lo memorizza automaticamente).\n"
+                f"4. Clicca su 'Trasmetti Ordine Ora' e i file voleranno direttamente al laboratorio!\n"
             )
-        print(f"\n   [✓] Il link è stato salvato anche in: {link_file.name}")
+        print(f"\n   [✓] L'indirizzo e le istruzioni sono stati salvati in: {link_file.name}")
     else:
         print(f"\n👉 INDIRIZZO LOCALE (Stesso Wi-Fi): http://localhost:{PORT}")
 
