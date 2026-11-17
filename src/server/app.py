@@ -85,10 +85,25 @@ DASHBOARD_HTML = """
         .btn-danger { background: rgba(231, 76, 60, 0.2); color: #E74C3C; border: 1px solid rgba(231, 76, 60, 0.4); }
         .btn-danger:hover { background: #E74C3C; color: #fff; }
 
-        select.status-select { background: #18191C; color: var(--text-main); border: 1px solid var(--border); padding: 5px 8px; border-radius: 5px; font-size: 0.8rem; cursor: pointer; }
+        select.status-select { background: #18191C; color: var(--text-main); border: 1px solid var(--border); padding: 5px 8px; border-radius: 5px; font-size: 0.8rem; cursor: pointer; transition: border-color 0.2s; }
+        .toast-msg {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #2ECC71;
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            display: none;
+            z-index: 9999;
+        }
     </style>
 </head>
 <body>
+    <div id="toast" class="toast-msg"></div>
 
     <header>
         <div class="brand">
@@ -165,11 +180,11 @@ DASHBOARD_HTML = """
                             <strong>{{ o.totale_file }} foto</strong>
                         </td>
                         <td>
-                            <select class="status-select" onchange="aggiornaStato('{{ o.order_id }}', this.value)">
-                                <option value="IN ATTESA" {% if o.stato == 'IN ATTESA' %}selected{% endif %}>🟡 In Attesa</option>
-                                <option value="IN STAMPA" {% if o.stato == 'IN STAMPA' %}selected{% endif %}>🔵 In Stampa</option>
-                                <option value="IN LEGATORIA" {% if o.stato == 'IN LEGATORIA' %}selected{% endif %}>🟣 In Legatoria</option>
-                                <option value="PRONTO" {% if o.stato == 'PRONTO' %}selected{% endif %}>🟢 Pronto / Spedito</option>
+                            <select class="status-select" data-current="{{ o.stato }}" onchange="aggiornaStato(this, '{{ o.order_id }}')">
+                                <option value="IN ATTESA" {% if o.stato|upper|trim == 'IN ATTESA' %}selected{% endif %}>🟡 In Attesa</option>
+                                <option value="IN STAMPA" {% if o.stato|upper|trim == 'IN STAMPA' %}selected{% endif %}>🔵 In Stampa</option>
+                                <option value="IN LEGATORIA" {% if o.stato|upper|trim == 'IN LEGATORIA' %}selected{% endif %}>🟣 In Legatoria</option>
+                                <option value="PRONTO" {% if o.stato|upper|trim == 'PRONTO' %}selected{% endif %}>🟢 Pronto / Spedito</option>
                             </select>
                         </td>
                         <td>
@@ -199,7 +214,27 @@ DASHBOARD_HTML = """
     </div>
 
     <script>
-        function aggiornaStato(orderId, nuovoStato) {
+        let reloadTimer = null;
+        function resetReloadTimer() {
+            if (reloadTimer) clearTimeout(reloadTimer);
+            reloadTimer = setTimeout(() => location.reload(), 15000);
+        }
+        resetReloadTimer();
+
+        function showToast(text, isError = false) {
+            const toast = document.getElementById('toast');
+            toast.textContent = text;
+            toast.style.background = isError ? '#E74C3C' : '#2ECC71';
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 2500);
+        }
+
+        function aggiornaStato(selectElem, orderId) {
+            const vecchioStato = selectElem.getAttribute('data-current') || selectElem.value;
+            const nuovoStato = selectElem.value;
+            selectElem.disabled = true;
+            resetReloadTimer();
+
             fetch(`/api/orders/${orderId}/status`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -207,13 +242,24 @@ DASHBOARD_HTML = """
             })
             .then(res => res.json())
             .then(data => {
+                selectElem.disabled = false;
                 if(data.success) {
-                    console.log('Stato aggiornato');
+                    selectElem.setAttribute('data-current', nuovoStato);
+                    selectElem.style.borderColor = '#2ECC71';
+                    showToast(`✓ Stato aggiornato: ${nuovoStato}`);
+                    setTimeout(() => { selectElem.style.borderColor = ''; }, 2000);
                 } else {
-                    alert('Errore aggiornamento stato');
+                    selectElem.value = vecchioStato;
+                    showToast('Errore durante il salvataggio!', true);
                 }
+            })
+            .catch(err => {
+                selectElem.disabled = false;
+                selectElem.value = vecchioStato;
+                showToast('Errore di connessione!', true);
             });
         }
+
         function eliminaOrdine(orderId) {
             if (confirm('Sei sicuro di voler eliminare la commessa ' + orderId + '?\nQuesta operazione rimuoverà definitivamente anche le foto archiviate sul server.')) {
                 fetch('/api/orders/' + orderId, { method: 'DELETE' })
@@ -227,8 +273,6 @@ DASHBOARD_HTML = """
                     });
             }
         }
-        // Auto-refresh ogni 15 secondi per nuovi ordini in arrivo
-        setTimeout(() => location.reload(), 15000);
     </script>
 </body>
 </html>

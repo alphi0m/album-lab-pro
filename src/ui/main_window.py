@@ -16,7 +16,6 @@ from src.ui.theme import (
 from src.ui.editor import EditorPanel
 from src.ui.thumbnails import MiniaturePanel
 from src.ui.panels import ModelloPanel, FormatiPanel, MaterialiPanel, InfoOrdinePanel
-from src.ui.archive import ArchivioOrdiniWindow
 from src.ui.catalog_dialog import CatalogGalleryWindow
 from src.ui.upload_dialog import UploadDialog
 
@@ -123,9 +122,6 @@ class MainApp:
 
         ttk.Separator(toolbar, orient="vertical").pack(side="left", fill="y", padx=10, pady=8)
 
-        ttk.Button(toolbar, text="📦 Archivio Ordini", style="TButton",
-                   command=self.apri_archivio).pack(side="left", padx=5, pady=6)
-
         ttk.Button(toolbar, text="✨ Nuovo Ordine", style="TButton",
                    command=self.nuovo_ordine).pack(side="left", padx=5, pady=6)
 
@@ -146,7 +142,6 @@ class MainApp:
         menu_file.add_command(label="🚀 Invia al Laboratorio...", command=self.invia_al_laboratorio)
         menu_file.add_command(label="💾 Salva Locale (Ctrl+S)", command=self.salva_ordine)
         menu_file.add_separator()
-        menu_file.add_command(label="Archivio Ordini", command=self.apri_archivio)
         menu_file.add_command(label="Nuovo Ordine / Reset", command=self.nuovo_ordine)
         menu_file.add_separator()
         menu_file.add_command(label="Esci", command=self.root.quit)
@@ -431,12 +426,6 @@ class MainApp:
     def _on_ordine_inviato(self, order_id: str):
         """Eseguito al termine dell'invio con successo al laboratorio."""
         self.info_panel.reset_for_new_order()
-
-    def apri_archivio(self):
-        try:
-            ArchivioOrdiniWindow(self.root, self)
-        except Exception as e:
-            messagebox.showerror("Errore", f"Impossibile aprire l'archivio:\n{e}")
 
     def nuovo_ordine(self):
         if self.foto_list or self.modello_selezionato:

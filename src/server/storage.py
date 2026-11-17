@@ -118,10 +118,13 @@ class ServerStorage:
         if not ordine:
             return False
 
-        ordine["stato"] = nuovo_stato.upper()
+        clean_status = str(nuovo_stato).strip().upper()
+        ordine["stato"] = clean_status
         ordine["ultimo_aggiornamento"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        json_path = Path(ordine["_folder"]) / "order.json"
+        cls.init()
+        order_folder = SERVER_ORDERS_DIR / order_id
+        json_path = order_folder / "order.json"
         try:
             with open(json_path, "w", encoding="utf-8") as f:
                 json.dump(ordine, f, indent=4, ensure_ascii=False)

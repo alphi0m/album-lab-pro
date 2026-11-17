@@ -36,6 +36,8 @@ __pycache__/
 archivio_ordini/
 server_data/orders/
 config.json
+LINK_PER_I_FOTOGRAFI.txt
+tools/
 *.sqlite3
 *.log
 
