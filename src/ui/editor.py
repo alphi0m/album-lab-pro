@@ -366,6 +366,10 @@ class EditorPanel(tk.Frame):
         if self.img_scale <= 0:
             return
 
+        # Evita micro-ritagli accidentali causati da un singolo clic del mouse
+        if abs(cx2 - cx1) < 15 or abs(cy2 - cy1) < 15:
+            return
+
         ox1 = (cx1 - self.img_x) / self.img_scale
         oy1 = (cy1 - self.img_y) / self.img_scale
         ox2 = (cx2 - self.img_x) / self.img_scale

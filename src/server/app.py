@@ -383,10 +383,15 @@ def api_post_order():
     try:
         # Preleva i metadati JSON inviati nel campo 'metadata'
         metadata_str = request.form.get("metadata", "{}")
-        metadata = json.loads(metadata_str)
+        try:
+            metadata = json.loads(metadata_str)
+        except Exception:
+            return jsonify({"success": False, "error": "Formato metadati JSON non valido."}), 400
 
         # Preleva tutti i file fotografici inviati
         uploaded_files = request.files.getlist("photos")
+        if not uploaded_files:
+            return jsonify({"success": False, "error": "Nessun file fotografico allegato all'ordine."}), 400
 
         # Genera un ID commessa univoco
         order_id = ServerStorage.genera_order_id()

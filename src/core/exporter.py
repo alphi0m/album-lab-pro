@@ -4,6 +4,7 @@ Modulo di esportazione degli ordini e preparazione file per la stampa ad alta ri
 
 import json
 import os
+import re
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -24,12 +25,15 @@ class OrderExporter:
             dpi_val = config.get("dpi_stampa", DEFAULT_DPI) if config else DEFAULT_DPI
             quality_val = config.get("qualita_jpeg", DEFAULT_JPEG_QUALITY) if config else DEFAULT_JPEG_QUALITY
             
-            num_busta = order_data.get("num_busta", "senza_numero")
-            folder_name = f"ordine_{num_busta}"
+            num_busta = str(order_data.get("num_busta", "senza_numero")).strip()
+            # Sanifica il numero busta per evitare caratteri non validi nei percorsi file (es. /, \, :, *)
+            safe_busta = re.sub(r'[\\/*?:"<>|]', '_', num_busta) or "senza_numero"
+            folder_name = f"ordine_{safe_busta}"
             cartella_ordine = ARCHIVIO_DIR / folder_name
             cartella_ordine.mkdir(parents=True, exist_ok=True)
 
             foto_json_list = []
+            used_filenames = set()
 
             for idx, foto in enumerate(foto_list, start=1):
                 ext = Path(foto.path).suffix.lower()
@@ -37,7 +41,14 @@ class OrderExporter:
                     ext = ".jpg"
                 
                 base_name = Path(foto.path).stem
+                # Evita collisioni se più foto hanno lo stesso nome file (es. DSC_0001 da fotocamere diverse)
                 out_filename = f"{base_name}_stampa{ext}"
+                counter = 2
+                while out_filename in used_filenames:
+                    out_filename = f"{base_name}_{counter}_stampa{ext}"
+                    counter += 1
+                used_filenames.add(out_filename)
+
                 out_path = cartella_ordine / out_filename
 
                 # Ottieni l'immagine ritagliata alla risoluzione nativa

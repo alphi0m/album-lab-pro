@@ -33,7 +33,7 @@ class ServerStorage:
     def genera_order_id() -> str:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         import random
-        rand_suffix = random.randint(100, 999)
+        rand_suffix = random.randint(1000, 9999)
         return f"ORD-{timestamp}-{rand_suffix}"
 
     @classmethod
@@ -47,13 +47,21 @@ class ServerStorage:
         photos_folder = order_folder / "photos"
         photos_folder.mkdir(parents=True, exist_ok=True)
 
-        # Salva i file fotografici
+        # Salva i file fotografici sanificando i nomi ed evitando collisioni
         saved_files_info = []
         for file_storage in files:
-            filename = file_storage.filename
-            dest_path = photos_folder / filename
+            raw_filename = Path(file_storage.filename or "foto.jpg").name
+            dest_name = raw_filename
+            counter = 2
+            p_stem = Path(raw_filename).stem
+            p_ext = Path(raw_filename).suffix
+            while (photos_folder / dest_name).exists():
+                dest_name = f"{p_stem}_{counter}{p_ext}"
+                counter += 1
+
+            dest_path = photos_folder / dest_name
             file_storage.save(str(dest_path))
-            saved_files_info.append(filename)
+            saved_files_info.append(dest_name)
 
         # Metadati completi con stato iniziale
         metadata["order_id"] = order_id
