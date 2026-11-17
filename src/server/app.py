@@ -97,7 +97,7 @@ DASHBOARD_HTML = """
         </div>
         <div class="live-status">
             <span class="pulse-dot"></span>
-            <span>Server di Produzione Attivo (Porta 5000)</span>
+            <span>Server di Produzione Attivo (Porta {{ port }})</span>
         </div>
     </header>
 
@@ -344,7 +344,8 @@ def index():
 def admin_dashboard():
     """Dashboard visuale web per l'amico del laboratorio."""
     ordini = ServerStorage.get_tutti_ordini()
-    return render_template_string(DASHBOARD_HTML, ordini=ordini)
+    port = app.config.get("SERVER_PORT", 5050)
+    return render_template_string(DASHBOARD_HTML, ordini=ordini, port=port)
 
 
 @app.route("/admin/orders/<order_id>/scheda")
@@ -445,10 +446,20 @@ def api_delete_order(order_id):
     return jsonify({"success": ok})
 
 
-def start_server(host="0.0.0.0", port=5000):
-    """Avvia il server Flask."""
-    print(f"\n🚀 Server Album Lab avviato su http://localhost:{port}/admin")
-    app.run(host=host, port=port, debug=False)
+def start_server(host="0.0.0.0", port=5050):
+    """Avvia il server Flask verificando la disponibilità della porta."""
+    import socket
+    def is_port_free(p):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            return s.connect_ex(("127.0.0.1", p)) != 0
+
+    target_port = port
+    while not is_port_free(target_port) and target_port < port + 20:
+        target_port += 1
+
+    app.config["SERVER_PORT"] = target_port
+    print(f"\n🚀 Server Album Lab avviato su http://localhost:{target_port}/admin")
+    app.run(host=host, port=target_port, debug=False)
 
 
 if __name__ == "__main__":

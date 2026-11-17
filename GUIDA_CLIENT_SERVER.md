@@ -32,9 +32,9 @@ python server.py
 ```
 *(Oppure cliccando sull'eseguibile `AlbumLabServer`)*
 
-Il server si avvierà sulla porta `5000`.
+Il server si avvierà sulla porta `5050` (evitando conflitti con AirPlay su Mac).
 Puoi aprire immediatamente il browser su:
-👉 **`http://localhost:5000/admin`**
+👉 **`http://localhost:5050/admin`**
 
 Vedrai la **Dashboard di Produzione Dark Studio**:
 - Contatori in tempo reale: *Commesse Ricevute*, *In Attesa*, *In Lavorazione*, *Completati*.
@@ -68,7 +68,7 @@ python main.py
 ---
 
 ### Passo 3: Ricezione e Lavorazione nel Laboratorio
-Torna sulla pagina Web del laboratorio (`http://localhost:5000/admin`):
+Torna sulla pagina Web del laboratorio (`http://localhost:5050/admin`):
 1. **Nuovo Ordine Visibile:** L'ordine compare subito in tabella con badge colorato 🟡 `IN ATTESA`.
 2. **Scheda Commessa A4:** Clicca sul pulsante **"🖨️ Scheda"** per aprire e stampare il foglio di lavoro pronto per il banco di legatoria, con codice a barre, nomi degli sposi in evidenza, modello album, copertina e firme di controllo.
 3. **Download ZIP Minilab:** Clicca su **"📥 ZIP"** per scaricare l'archivio contenente tutte le foto già ritagliate a 300 DPI + il file JSON riepilogativo.
@@ -85,7 +85,7 @@ Sul computer del laboratorio (dove gira `python server.py`):
 1. Scarica [Cloudflare Tunnel (cloudflared)](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/).
 2. Esegui semplicemente:
    ```bash
-   cloudflared tunnel --url http://localhost:5000
+   cloudflared tunnel --url http://localhost:5050
    ```
 3. Il terminale genererà un link pubblico sicuro del tipo:
    `https://random-subdomain.trycloudflare.com`
@@ -93,7 +93,7 @@ Sul computer del laboratorio (dove gira `python server.py`):
 
 ### Metodo B: Con Ngrok
 ```bash
-ngrok http 5000
+ngrok http 5050
 ```
 Fornisce un link pubblico `https://...ngrok-free.app` da inserire nel client.
 

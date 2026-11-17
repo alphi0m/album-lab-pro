@@ -121,7 +121,7 @@ class UploadDialog(tk.Toplevel):
         srv_row = tk.Frame(sec_conn, bg=BG_CARD)
         srv_row.pack(fill="x")
 
-        saved_url = self.config_mgr.get("server_url", "http://localhost:5000")
+        saved_url = self.config_mgr.get("server_url", "http://localhost:5050")
         self.var_url = tk.StringVar(value=saved_url)
 
         self.entry_url = tk.Entry(

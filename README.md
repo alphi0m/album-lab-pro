@@ -154,7 +154,7 @@ python main.py
 python server.py
 ```
 Accedi dal browser alla Dashboard di produzione:
-👉 **`http://localhost:5000/admin`**
+👉 **`http://localhost:5050/admin`**
 - Visualizza gli ordini in tempo reale.
 - Clicca su **"🖨️ Scheda"** per stampare il foglio di lavoro A4 con barcode per il banco di legatoria.
 - Clicca su **"📥 ZIP"** per scaricare tutte le foto già ritagliate a 300 DPI.

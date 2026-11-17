@@ -54,6 +54,7 @@ class ConfigManager:
             "ultimo_num_busta": 1,
             "dpi_stampa": 300,
             "qualita_jpeg": 98,
+            "server_url": "http://localhost:5050",
         }
         self.save(default_config)
         return default_config
