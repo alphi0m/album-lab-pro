@@ -3,7 +3,7 @@ Pannello scorrevole delle miniature in stile Dark Studio con hover effect e gest
 """
 
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, simpledialog, messagebox
 from src.core.constants import FORMATI
 from src.ui.theme import (
     BG_APP, BG_CARD, BG_HOVER, BG_INPUT, PRIMARY, PRIMARY_HOVER,
@@ -37,22 +37,28 @@ class MiniaturePanel(tk.Frame):
 
         # Pulsanti rapidi quantità con stile Dark
         btn_plus = ttk.Button(
-            self.toolbar, text="+ Copia", width=8,
+            self.toolbar, text="+ Copia", width=7,
             command=lambda: self.modifica_quantita_selezionate(1)
         )
-        btn_plus.pack(side="right", padx=3)
+        btn_plus.pack(side="right", padx=2)
 
         btn_minus = ttk.Button(
-            self.toolbar, text="− Copia", width=8,
+            self.toolbar, text="− Copia", width=7,
             command=lambda: self.modifica_quantita_selezionate(-1)
         )
-        btn_minus.pack(side="right", padx=3)
+        btn_minus.pack(side="right", padx=2)
+
+        btn_set_copies = ttk.Button(
+            self.toolbar, text="🔢 Copie...", width=8,
+            command=self._chiedi_imposta_copie
+        )
+        btn_set_copies.pack(side="right", padx=2)
 
         btn_select_all = ttk.Button(
-            self.toolbar, text="Tutto", width=6,
+            self.toolbar, text="Tutto", width=5,
             command=self.seleziona_tutto
         )
-        btn_select_all.pack(side="right", padx=3)
+        btn_select_all.pack(side="right", padx=2)
 
         # ---------------- Canvas con Scrollbar Dark ----------------
         self.container = tk.Frame(self, bg=BG_APP)
@@ -144,10 +150,38 @@ class MiniaturePanel(tk.Frame):
             fg=TEXT_MUTED,
             font=("Helvetica", 9)
         )
-        lbl_name.pack(pady=(0, 4))
+        lbl_name.pack(pady=(0, 2))
+
+        # Controllo rapido copie direttamente sulla miniatura
+        bar_qty = tk.Frame(card, bg=BG_CARD)
+        bar_qty.pack(fill="x", padx=4, pady=(0, 4))
+
+        btn_q_min = tk.Button(
+            bar_qty, text="−", width=2, bg="#262830", fg="#FFF",
+            bd=0, activebackground=PRIMARY, activeforeground="#FFF",
+            cursor="hand2", font=("Helvetica", 8, "bold"),
+            command=lambda i=idx: self._modifica_quantita_singola(i, -1)
+        )
+        btn_q_min.pack(side="left")
+
+        lbl_qty = tk.Label(
+            bar_qty, text=f"{foto.quantita} cp", bg=BG_CARD,
+            fg=PRIMARY if foto.quantita > 1 else TEXT_MUTED,
+            font=("Helvetica", 9, "bold")
+        )
+        lbl_qty.pack(side="left", fill="x", expand=True)
+
+        btn_q_plus = tk.Button(
+            bar_qty, text="+", width=2, bg="#262830", fg="#FFF",
+            bd=0, activebackground=PRIMARY, activeforeground="#FFF",
+            cursor="hand2", font=("Helvetica", 8, "bold"),
+            command=lambda i=idx: self._modifica_quantita_singola(i, 1)
+        )
+        btn_q_plus.pack(side="right")
 
         card.lbl_name = lbl_name
         card.lbl_img = lbl_img
+        card.lbl_qty = lbl_qty
 
         # Gestione Hover Effect (bordo si illumina delicatamente)
         def on_enter(e):
@@ -254,4 +288,38 @@ class MiniaturePanel(tk.Frame):
                 self.foto_items[idx]._thumb_cache.clear()
 
         self.aggiorna_vista()
+        self.main_app._aggiorna_stats()
         self.main_app.editor_panel._aggiorna_info()
+
+    def _modifica_quantita_singola(self, idx: int, delta: int):
+        if 0 <= idx < len(self.foto_items):
+            nuova = max(1, self.foto_items[idx].quantita + delta)
+            self.foto_items[idx].quantita = nuova
+            self.foto_items[idx]._thumb_cache.clear()
+            self.aggiorna_vista()
+            self.main_app._aggiorna_stats()
+            self.main_app.editor_panel._aggiorna_info()
+
+    def _chiedi_imposta_copie(self):
+        target_indices = self.selected_indices if self.selected_indices else ({self.active_index} if self.active_index is not None else set(range(len(self.foto_items))))
+        if not target_indices:
+            messagebox.showinfo("Nessuna Foto", "Nessuna foto selezionata.")
+            return
+
+        quante_foto = len(target_indices)
+        nuove_copie = simpledialog.askinteger(
+            "Imposta Copie",
+            f"Inserisci il numero di copie da assegnare a {quante_foto} foto:",
+            initialvalue=1,
+            minvalue=1,
+            maxvalue=999,
+            parent=self.winfo_toplevel()
+        )
+        if nuove_copie is not None:
+            for idx in target_indices:
+                if 0 <= idx < len(self.foto_items):
+                    self.foto_items[idx].quantita = nuove_copie
+                    self.foto_items[idx]._thumb_cache.clear()
+            self.aggiorna_vista()
+            self.main_app._aggiorna_stats()
+            self.main_app.editor_panel._aggiorna_info()

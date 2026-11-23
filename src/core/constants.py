@@ -8,9 +8,11 @@ from pathlib import Path
 
 # Formati di stampa standard (larghezza in cm, altezza in cm)
 FORMATI = {
+    "10x13": (10, 13),
     "10x15": (10, 15),
     "13x18": (13, 18),
     "15x20": (15, 20),
+    "15x22": (15, 22),
     "20x25": (20, 25),
     "20x30": (20, 30),
     "24x30": (24, 30),
@@ -30,6 +32,14 @@ FORMATI = {
     "60x80": (60, 80),
     "70x100": (70, 100),
 }
+
+# Tipi di carta fotografica ufficiali del laboratorio (supporti fisici minilab)
+CARTE_FOTO = ["Lucida", "Satinata", "Seta"]
+CARTA_FOTO_DEFAULT = "Lucida"
+
+# Modalità di lavoro
+MODO_ALBUM = "album"
+MODO_STAMPE = "stampe"
 
 # Gestione percorsi compatibile sia con ambiente di sviluppo che con eseguibili pacchettizzati (PyInstaller)
 if getattr(sys, "frozen", False):

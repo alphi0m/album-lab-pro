@@ -23,16 +23,20 @@
 
 ## 🎯 Il Problema & La Soluzione
 
-Nel settore dei laboratori fotografici e della legatoria artigianale di album matrimoniali, la comunicazione tra fotografo e stampatore è storicamente problematica:
+Nel settore dei laboratori fotografici e della legatoria artigianale di album matrimoniali e stampe professionali, la comunicazione tra fotografo e stampatore è storicamente problematica:
 - Invio di file tramite servizi esterni (WeTransfer, Drive) senza specifiche tecniche formattate.
 - Disallineamento dei formati e tagli errati delle teste degli sposi o dei dettagli critici.
 - Alterazioni cromatiche causate dalla perdita dei profili colore originali durante la compressione.
 - Errori umani nella trascrizione dei nomi degli sposi per l'incisione e nella scelta dei campionari di tessuto o pelle della copertina.
 - File omonimi provenienti da corpi macchina diversi (es. `DSC_0001.JPG`) che si sovrascrivono a vicenda.
+- Rigidità dei software tradizionali che forzano le foto singole nei cataloghi album o viceversa.
 
-**Album Lab Pro** risolve questi problemi unificando il flusso in due componenti sincronizzate:
-1. **Client Desktop per il Fotografo:** applicazione grafica *Dark Studio* per comporre l'ordine, selezionare il modello dal catalogo vincolando materiali e formati consentiti, ritagliare le immagini a 300 DPI preservando lo spazio colore nativo e trasmettere la commessa via streaming.
-2. **Server & Dashboard Web per il Laboratorio:** server centralizzato che riceve l'ordine in streaming, visualizza i lavori in arrivo su una dashboard aggiornata in tempo reale con toast notifications, genera la **Scheda Commessa A4 stampabile con codice a barre** e compila automaticamente l'archivio ZIP pronto per i minilab di stampa.
+**Album Lab Pro** risolve questi problemi con un'architettura integrata e una modalità duale dedicata:
+1. **Modalità Duale Studio & Minilab:**
+   - **📖 Stampa Album:** Flusso per fotolibri e album nozze vincolato al catalogo modelli, campionari pelle/tessuto reali, cofanetti coordinati e incisione a caldo dei nomi sposi.
+   - **🖼️ Stampe Fotografiche Singole:** Pipeline veloce da banco per foto sciolte e ingrandimenti (da 10x13 a 70x100), moltiplicatore copie per foto o in blocco ("Applica a Tutte") e supporto carte minilab dedicate (*Lucida, Satinata, Seta*).
+2. **Client Desktop per il Fotografo:** applicazione grafica *Dark Studio* con ritaglio calibrato a 300 DPI, maschera semi-trasparente Lightroom-style, controllo conflitti busta in tempo reale e trasmissione streaming.
+3. **Server & Dashboard Web per il Laboratorio:** server centralizzato che riceve l'ordine in streaming, visualizza i lavori in arrivo su una dashboard aggiornata in tempo reale con toast notifications, genera la **Scheda Commessa A4 stampabile con codice a barre** e compila automaticamente l'archivio ZIP pronto per i minilab di stampa.
 
 ---
 
@@ -59,14 +63,12 @@ Nel settore dei laboratori fotografici e della legatoria artigianale di album ma
 ### 1. Elaborazione Immagini Non Distruttiva & Profilo Colore ICC
 - **Calibrazione a 300 DPI:** I ritagli non scalano l'immagine visibile a schermo, ma mappano le coordinate relative normalizzate sulla matrice dell'immagine nativa ad alta risoluzione (24-50+ MP).
 - **Integrità Cromatica ICC:** Preservazione trasparente del payload binario del profilo colore nativo (sRGB, Adobe RGB 1998, ProPhoto RGB) durante la scrittura JPEG, prevenendo qualsiasi "color-shift" nei plotter professionali e nei minilab a ioduro d'argento.
+- **Maschera Ritaglio Semi-Trasparente Lightroom-Style:** Visualizzazione opaca ad alta luminosità (~42%) delle aree esterne scartate tramite accelerazione PIL LUT (< 0.5 ms per frame), consentendo all'operatore di non perdere mai il contesto visivo della composizione ed evitando il buio totale dei vecchi software.
 - **Normalizzazione Aspect Ratio:** Algoritmo per rilevare e avvisare in caso di disallineamento geometrico tra il sensore fotografico (es. 3:2) e il formato di stampa selezionato (es. 4:5 o quadrato 1:1).
 
-### 2. Motore Dinamico del Catalogo Prodotti (18 Modelli)
-- Implementazione del dataset completo della linea ufficiale con vincoli condizionali rigidi:
-  - Formati ammessi dipendenti dal modello (quadrati, panoramici, verticali).
-  - Tipi di carta interna compatibili (*Lucide, Satinate, Velvet HD, Tela Fine Art*).
-  - Campionari colore abbinati (*Vellutino, Canapina, Tacto, Wood, Tweed, Zebrano, Spigato, Coagulato*).
-  - Supporto per campi personalizzati dedicati (es. incisione a caldo dei nomi degli sposi e finitura cofanetto).
+### 2. Motore Catalogo Album & Pipeline Stampe Singole
+- **Catalogo Linea Estro Wedding (18 Modelli):** Vincoli condizionali rigidi su formati ammessi (quadrati, panoramici, verticali), carte interne (*Lucide, Satinate, Velvet HD, Tela Fine Art*), campionari colore abbinati (*Vellutino, Canapina, Tacto, Wood, Tweed, Zebrano, Spigato, Coagulato*) e incisione nomi sposi.
+- **Pipeline Stampe Fotografiche Singole:** Flusso rapido da banco per stampe e ingrandimenti su supporti minilab fisici (*Lucida* come standard predefinito, *Satinata*, *Seta*), con pulsanti "⚡ Applica Formato a Tutte", "⚡ Applica Carta a Tutte" e gestione copie rapida per singola foto o in batch.
 
 ### 3. Pipeline di Rete con Streaming Multipart e Monitoraggio Byte-by-Byte
 - Modulo di trasmissione (`src/services/network.py`) basato su `requests-toolbelt`:
@@ -74,15 +76,17 @@ Nel settore dei laboratori fotografici e della legatoria artigianale di album ma
   - Callback di monitoraggio che aggiorna in tempo reale la percentuale e i megabyte trasferiti (`X MB / Y MB`).
   - Threading asincrono disaccoppiato dall'interfaccia utente con supporto per l'interruzione pulita (*cancellation token*).
 
-### 4. Deduplicazione Intelligente & Sanitizzazione File System
+### 4. Deduplicazione, Buste Progressive & Rilevamento Conflitti
+- **Numero Busta Progressivo Intelligente:** Calcolo automatico della prossima busta libera nell'archivio locale con verifica conflitti in tempo reale (`✓ Libero` / `⚠️ Già in uso`) e risoluzione guidata dei duplicati.
 - **Prevenzione Sovrascrittura Multi-Camera:** Negli eventi matrimoniali con più fotografi che usano scatti con lo stesso nome (es. `DSC_0001.JPG`), un motore di deduplicazione dinamico genera suffissi progressivi univoci sia in esportazione locale sia sul server (`DSC_0001_stampa.jpg`, `DSC_0001_2_stampa.jpg`), garantendo zero perdite di file.
 - **Sanitizzazione Cross-Platform:** Normalizzazione regex dei numeri di busta e dei metadati per evitare caratteri illegali nei filesystem (`/`, `\`, `:`, `*`, `?`), prevenendo errori su Windows e macOS.
 
 ### 5. Connettività Zero-Config con Cloudflare Tunnel
 - **Avvio 1-Click per il Laboratorio:** Tramite gli script a doppio clic `avvia_laboratorio.command` (macOS) e `avvia_laboratorio.bat` (Windows), il sistema avvia il server, scarica automaticamente il client ufficiale Cloudflare se assente, attiva un tunnel HTTPS cifrato, salva l'indirizzo server in `INDIRIZZO_SERVER_PER_FOTOGRAFI.txt` e apre direttamente la dashboard nel browser del laboratorio (il fotografo non usa il browser, usa esclusivamente l'app desktop!).
 
-### 6. Interfaccia Grafica Dark Studio HiDPI / Retina
+### 6. Interfaccia Grafica Dark Studio HiDPI / Retina & Box Note Ergonomico
 - Palette cromatica professionale (`#121316`, `#18191C`, `#0078FF`) studiata per evitare l'affaticamento visivo e non alterare la percezione dei colori fotografici.
+- Area **Note di Lavorazione** ampliata a 5 righe con scrollbar fluida, bordo ad alto contrasto e placeholder descrittivo per richieste speciali (bordini bianchi, correzioni, finiture).
 - Calcolo automatico della scala DPI (`tk scaling`) per garantire pulsanti generosi (36-38px) e tipografia nitida sia su schermi Apple Retina che su monitor PC 1080p/2K/4K.
 - Icona macOS conforme agli standard Apple HIG Squircle (raggio continuo e drop shadow morbido).
 
@@ -195,6 +199,12 @@ python tests/test_e2e_orders.py
 python tests/test_robustness.py
 ```
 * Valida: gestione foto con nomi identici da due corpi macchina (`DSC_0001.JPG`), caratteri speciali nel numero busta (`12/2026:Special*Test`), caratteri accentati nei metadati degli sposi (`Éléonore & Nicolò`), rifiuto payload corrotti (HTTP 400) e conformità 300x300 DPI.
+
+### Test 3: Evoluzione di Dominio, Stampe Singole & Buste Progressive
+```bash
+python tests/test_domain_evolution.py
+```
+* Valida: pipeline completa stampe singole a 300 DPI, supporti carte minilab (*Lucida, Satinata, Seta*), accelerazione PIL LUT maschera ritaglio semi-trasparente (< 0.5 ms), calcolo automatico buste progressive e rilevamento conflitti/duplicati in tempo reale.
 
 Risultato collaudi:
 ```text

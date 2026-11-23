@@ -170,8 +170,13 @@ DASHBOARD_HTML = """
                             {% endif %}
                         </td>
                         <td>
-                            <strong style="color: #66B2FF;">{{ o.modello_nome or 'Stampe Sfuse' }}</strong><br>
+                            {% if o.tipo_servizio == 'STAMPE_FOTO' or o.modello_id == 'stampe_singole' %}
+                            <strong style="color: #2ECC71;">🖼️ Stampe Singole</strong><br>
                             <small>{{ o.formato_globale }}</small>
+                            {% else %}
+                            <strong style="color: #66B2FF;">📖 {{ o.modello_nome or 'Stampa Album' }}</strong><br>
+                            <small>{{ o.formato_globale }}</small>
+                            {% endif %}
                         </td>
                         <td>
                             <small>{{ o.materiale_globale }}</small>
@@ -335,15 +340,26 @@ SCHEDA_COMMESSA_HTML = """
             <p>{{ ordine.data_ricezione }}</p>
         </div>
         <div class="box box-highlight">
-            <h3>Modello Album da Costruire</h3>
-            <p style="font-size: 16px; color: #0066cc;">{{ ordine.modello_nome or 'Stampe Fotografiche' }}</p>
+            {% if ordine.tipo_servizio == 'STAMPE_FOTO' or ordine.modello_id == 'stampe_singole' %}
+            <h3>Tipo Commessa</h3>
+            <p style="font-size: 16px; color: #27ae60;">Stampe Fotografiche Singole</p>
             <p style="font-size: 12px; font-weight: normal; margin-top: 4px;">Formato: <strong>{{ ordine.formato_globale }}</strong></p>
+            {% else %}
+            <h3>Modello Album da Costruire</h3>
+            <p style="font-size: 16px; color: #0066cc;">{{ ordine.modello_nome or 'Stampa Album' }}</p>
+            <p style="font-size: 12px; font-weight: normal; margin-top: 4px;">Formato: <strong>{{ ordine.formato_globale }}</strong></p>
+            {% endif %}
         </div>
         <div class="box box-highlight">
+            {% if ordine.tipo_servizio == 'STAMPE_FOTO' or ordine.modello_id == 'stampe_singole' %}
+            <h3>Supporto Carta Minilab</h3>
+            <p style="font-size: 15px;">{{ ordine.materiale_globale }}</p>
+            {% else %}
             <h3>Materiale & Colore Copertina</h3>
             <p style="font-size: 15px;">{{ ordine.materiale_globale }}</p>
             {% if ordine.modello_cofanetto %}
             <p style="font-size: 12px; font-weight: normal; margin-top: 4px;">Cofanetto: {{ ordine.modello_cofanetto }}</p>
+            {% endif %}
             {% endif %}
         </div>
     </div>
@@ -368,7 +384,11 @@ SCHEDA_COMMESSA_HTML = """
 
     <div class="signatures">
         <div class="sign-box">Controllo Stampa Minilab (Firma)</div>
+        {% if ordine.tipo_servizio == 'STAMPE_FOTO' or ordine.modello_id == 'stampe_singole' %}
+        <div class="sign-box">Controllo Taglio & Confezionamento Busta (Firma)</div>
+        {% else %}
         <div class="sign-box">Controllo Legatoria & Confezionamento (Firma)</div>
+        {% endif %}
     </div>
 </body>
 </html>

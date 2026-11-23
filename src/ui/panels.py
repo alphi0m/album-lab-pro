@@ -1,37 +1,43 @@
 """
-Pannelli di controllo Dark Studio con selezione dinamica del catalogo, formati vincolati e campionari colore reali.
+Pannelli di controllo Dark Studio: Gestione duale Stampa Album e Stampe Fotografiche Singole,
+formati dinamici, carte ufficiali minilab (Lucida, Satinata, Seta), controllo conflitti busta e note ergonomiche.
 """
 
 import os
+import re
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 from PIL import Image, ImageTk
-from src.core.constants import FORMATI, BASE_DIR
+from src.core.constants import (
+    FORMATI, BASE_DIR, CARTE_FOTO, CARTA_FOTO_DEFAULT, MODO_ALBUM, MODO_STAMPE
+)
 from src.core.catalog import MODELLI_ALBUM, CAMPIONARI_COLORI
 from src.ui.theme import (
-    BG_CARD, BG_INPUT, PRIMARY, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED, BORDER_COLOR
+    BG_CARD, BG_INPUT, PRIMARY, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED,
+    BORDER_COLOR, ACCENT_AMBER, SUCCESS, DANGER
 )
 
 
 # =============================================================================
-# 1. Pannello Selezione Modello Album dal Catalogo
+# 1. Pannello Selezione Modello Album / Modalità Ordine
 # =============================================================================
 class ModelloPanel(ttk.LabelFrame):
-    """Pannello in testata della colonna destra per visualizzare e scegliere il modello album."""
+    """Pannello in testata della colonna destra per visualizzare e scegliere il modello album o la modalità stampe."""
 
     def __init__(self, master, main_app):
-        super().__init__(master, text="Modello Album (Catalogo)", padding=12)
+        super().__init__(master, text="Stampa Album (Catalogo)", padding=12)
         self.main_app = main_app
         self.modello_corrente = None
         self.thumb_tk = None
+        self.modalita = MODO_ALBUM
 
         # Riga con nome modello e tasto per sfogliare
-        header_frame = tk.Frame(self, bg=BG_CARD)
-        header_frame.pack(fill="x")
+        self.header_frame = tk.Frame(self, bg=BG_CARD)
+        self.header_frame.pack(fill="x")
 
         self.lbl_nome = tk.Label(
-            header_frame,
-            text="Nessun modello (Stampe Sfuse)",
+            self.header_frame,
+            text="Nessun modello (Clicca Catalogo)",
             bg=BG_CARD,
             fg=TEXT_PRIMARY,
             font=("Helvetica", 11, "bold"),
@@ -39,14 +45,14 @@ class ModelloPanel(ttk.LabelFrame):
         )
         self.lbl_nome.pack(side="left", fill="x", expand=True)
 
-        btn_browse = ttk.Button(
-            header_frame,
+        self.btn_browse = ttk.Button(
+            self.header_frame,
             text="📖 Catalogo...",
             style="Primary.TButton",
             width=13,
             command=self.main_app.apri_catalogo
         )
-        btn_browse.pack(side="right")
+        self.btn_browse.pack(side="right")
 
         # Dettagli del modello selezionato
         self.details_frame = tk.Frame(self, bg=BG_CARD)
@@ -57,7 +63,7 @@ class ModelloPanel(ttk.LabelFrame):
 
         self.lbl_desc = tk.Label(
             self.details_frame,
-            text="Clicca su 'Catalogo...' per scegliere uno dei 18 modelli esclusivi.",
+            text="Clicca su 'Catalogo...' per scegliere uno dei modelli professionali.",
             bg=BG_CARD,
             fg=TEXT_MUTED,
             font=("Helvetica", 9),
@@ -67,10 +73,35 @@ class ModelloPanel(ttk.LabelFrame):
         )
         self.lbl_desc.pack(side="left", fill="both", expand=True)
 
+    def set_modalita(self, modalita: str):
+        self.modalita = modalita
+        if modalita == MODO_STAMPE:
+            self.config(text="Modalità Commessa")
+            self.btn_browse.pack_forget()
+            self.lbl_nome.config(text="Stampe Fotografiche Singole", fg=PRIMARY)
+            self.lbl_desc.config(
+                text="Produzione foto sciolte e ingrandimenti su carta minilab.\nNessun vincolo di modello o copertina."
+            )
+            self.lbl_preview_img.config(image="")
+            self.thumb_tk = None
+        else:
+            self.config(text="Stampa Album (Catalogo)")
+            self.btn_browse.pack(side="right")
+            if self.modello_corrente:
+                self.set_modello(self.modello_corrente)
+            else:
+                self.lbl_nome.config(text="Nessun modello (Clicca Catalogo)", fg=TEXT_PRIMARY)
+                self.lbl_desc.config(text="Clicca su 'Catalogo...' per scegliere un modello professionale.")
+                self.lbl_preview_img.config(image="")
+                self.thumb_tk = None
+
     def set_modello(self, modello: dict | None):
         self.modello_corrente = modello
+        if self.modalita == MODO_STAMPE:
+            return
+
         if not modello:
-            self.lbl_nome.config(text="Nessun modello (Stampe Sfuse)", fg=TEXT_PRIMARY)
+            self.lbl_nome.config(text="Nessun modello (Clicca Catalogo)", fg=TEXT_PRIMARY)
             self.lbl_desc.config(text="Seleziona un modello per vincolare formati e campionari.")
             self.lbl_preview_img.config(image="")
             self.thumb_tk = None
@@ -95,16 +126,18 @@ class ModelloPanel(ttk.LabelFrame):
 
 
 # =============================================================================
-# 2. Pannello Formati di Stampa con Vincolo Dinamico al Modello
+# 2. Pannello Formati di Stampa con Vincolo Dinamico & Applica a Tutte
 # =============================================================================
 class FormatiPanel(ttk.LabelFrame):
-    """Pannello formati: genera pillole dinamiche in base al modello selezionato."""
+    """Pannello formati: pillole rapide, dropdown completo e assegnazione in blocco."""
 
-    DEFAULT_FORMATS = ["10x15", "13x18", "15x20", "20x30", "30x30", "30x40", "40x40"]
+    DEFAULT_FORMATS_ALBUM = ["10x15", "13x18", "15x20", "20x30", "30x30", "30x40", "40x40"]
+    DEFAULT_FORMATS_STAMPE = ["10x13", "10x15", "13x18", "15x20", "20x30", "30x40"]
 
     def __init__(self, master, main_app):
         super().__init__(master, text="Formato di Stampa", padding=12)
         self.main_app = main_app
+        self.modalita = MODO_ALBUM
 
         self.formato_var = tk.StringVar(value="10x15")
         self.pill_buttons = {}
@@ -128,16 +161,41 @@ class FormatiPanel(ttk.LabelFrame):
         self.combo.pack(side="left", fill="x", expand=True)
         self.combo.bind("<<ComboboxSelected>>", self._on_combobox_selected)
 
-        # Pulsante rotazione orientamento
+        # Pulsanti d'azione (Rotazione e Applica a Tutte)
+        actions_frame = ttk.Frame(self, style="Card.TFrame")
+        actions_frame.pack(fill="x", pady=(4, 0))
+
         self.btn_rotate = ttk.Button(
-            self,
-            text="🔄 Inverti Orientamento (Spazio / R)",
+            actions_frame,
+            text="🔄 Inverti Crop (Spazio / R)",
             style="TButton",
             command=self._on_rotate_click
         )
-        self.btn_rotate.pack(fill="x", pady=(6, 2))
+        self.btn_rotate.pack(side="left", fill="x", expand=True, padx=(0, 3))
 
-        self.ricostruisci_pillole(self.DEFAULT_FORMATS)
+        self.btn_applica_tutte = ttk.Button(
+            actions_frame,
+            text="⚡ Applica a Tutte",
+            style="TButton",
+            command=self.applica_formato_a_tutte
+        )
+        self.btn_applica_tutte.pack(side="right", fill="x", expand=True, padx=(3, 0))
+
+        self.ricostruisci_pillole(self.DEFAULT_FORMATS_ALBUM)
+
+    def set_modalita(self, modalita: str):
+        self.modalita = modalita
+        if modalita == MODO_STAMPE:
+            self.config(text="Formato Stampe Singole")
+            self.ricostruisci_pillole(self.DEFAULT_FORMATS_STAMPE)
+            self.combo["values"] = list(FORMATI.keys())
+        else:
+            self.config(text="Formato di Stampa Album")
+            if self.main_app.modello_selezionato:
+                self.set_modello(self.main_app.modello_selezionato)
+            else:
+                self.ricostruisci_pillole(self.DEFAULT_FORMATS_ALBUM)
+                self.combo["values"] = list(FORMATI.keys())
 
     def ricostruisci_pillole(self, formati_list: list):
         """Ricrea i pulsanti a pillola in base ai formati abilitati."""
@@ -166,14 +224,17 @@ class FormatiPanel(ttk.LabelFrame):
 
     def set_modello(self, modello: dict | None):
         """Aggiorna i formati consentiti quando viene scelto un modello dal catalogo."""
+        if self.modalita == MODO_STAMPE:
+            return
+
         if modello and "formati" in modello:
             formati_modello = modello["formati"]
             self.ricostruisci_pillole(formati_modello)
             self.combo["values"] = formati_modello
-            if formati_modello:
+            if formati_modello and self.formato_var.get() not in formati_modello:
                 self.set_formato(formati_modello[0])
         else:
-            self.ricostruisci_pillole(self.DEFAULT_FORMATS)
+            self.ricostruisci_pillole(self.DEFAULT_FORMATS_ALBUM)
             self.combo["values"] = list(FORMATI.keys())
 
     def _aggiorna_pill_styles(self):
@@ -204,39 +265,68 @@ class FormatiPanel(ttk.LabelFrame):
         if hasattr(self.main_app, "editor_panel"):
             self.main_app.editor_panel.flip_crop_orientation()
 
+    def applica_formato_a_tutte(self):
+        """Applica il formato attualmente selezionato a tutte le foto caricate nell'ordine."""
+        if not self.main_app.foto_list:
+            messagebox.showinfo("Nessuna Foto", "Nessuna foto presente nell'ordine.")
+            return
+
+        formato_scelto = self.get_formato()
+        for f in self.main_app.foto_list:
+            f.formato = formato_scelto
+            # Resetta il crop per ricalcolarlo automaticamente con le nuove proporzioni
+            f.reset_crop()
+
+        if hasattr(self.main_app, "editor_panel"):
+            self.main_app.editor_panel._aggiorna_render()
+        if hasattr(self.main_app, "miniature_panel"):
+            self.main_app.miniature_panel.aggiorna_vista()
+
+        tot = len(self.main_app.foto_list)
+        messagebox.showinfo("Formato Applicato", f"Formato {formato_scelto} applicato con successo a tutte le {tot} foto.")
+
     def get_formato(self) -> str:
         return self.formato_var.get()
 
 
 # =============================================================================
-# 3. Pannello Materiali, Carta & Campionari Colore Reali
+# 3. Pannello Materiali & Carte Minilab (Lucida, Satinata, Seta)
 # =============================================================================
 class MaterialiPanel(ttk.LabelFrame):
-    """Pannello materiali: carica i campionari colore abbinati al modello scelto."""
+    """Pannello carte e materiali: gestisce carte minilab per stampe sciolte e campionari colore per album."""
 
     def __init__(self, master, main_app):
         super().__init__(master, text="Carta & Campionario Colori", padding=12)
         self.main_app = main_app
+        self.modalita = MODO_ALBUM
 
-        self.tipo_carta_var = tk.StringVar(value="Carta Lucida")
+        # Variabili album
+        self.tipo_carta_album_var = tk.StringVar(value="Carta Lucida")
         self.collezione_var = tk.StringVar()
         self.colore_var = tk.StringVar()
 
+        # Variabile carta stampe singole (Standard ufficiale minilab: Lucida)
+        self.carta_minilab_var = tk.StringVar(value=CARTA_FOTO_DEFAULT)
+
+        # ---------------- SOTTOPANNELLO 1: STAMPA ALBUM ----------------
+        self.frame_album = ttk.Frame(self, style="Card.TFrame")
+        self.frame_album.pack(fill="x")
+
         # Tipo carta interna
-        row_carta = ttk.Frame(self, style="Card.TFrame")
+        row_carta = ttk.Frame(self.frame_album, style="Card.TFrame")
         row_carta.pack(fill="x", pady=3)
 
         ttk.Label(row_carta, text="Carta Interna:", style="Card.TLabel").pack(side="left", padx=(0, 8))
         combo_carta = ttk.Combobox(
             row_carta,
-            textvariable=self.tipo_carta_var,
+            textvariable=self.tipo_carta_album_var,
             values=["Carta Lucida", "Satinata / Opaca", "Tela Fine Art", "Metallic / Silk", "Velvet HD"],
             state="readonly"
         )
         combo_carta.pack(side="right", fill="x", expand=True)
 
         # Selezione Collezione Tessuto / Pelle
-        row_coll = ttk.Frame(self, style="Card.TFrame")
+        row_coll = ttk.Frame(self.frame_album, style="Card.TFrame")
         row_coll.pack(fill="x", pady=4)
 
         ttk.Label(row_coll, text="Campionario:", style="Card.TLabel").pack(side="left", padx=(0, 8))
@@ -249,7 +339,7 @@ class MaterialiPanel(ttk.LabelFrame):
         self.combo_collezione.bind("<<ComboboxSelected>>", self._on_collezione_changed)
 
         # Selezione Colore / Codice reale
-        row_col = ttk.Frame(self, style="Card.TFrame")
+        row_col = ttk.Frame(self.frame_album, style="Card.TFrame")
         row_col.pack(fill="x", pady=3)
 
         ttk.Label(row_col, text="Colore / Codice:", style="Card.TLabel").pack(side="left", padx=(0, 8))
@@ -260,10 +350,81 @@ class MaterialiPanel(ttk.LabelFrame):
         )
         self.combo_colore.pack(side="right", fill="x", expand=True)
 
+        # ---------------- SOTTOPANNELLO 2: STAMPE SINGOLE ----------------
+        self.frame_stampe = ttk.Frame(self, style="Card.TFrame")
+        # Inizialmente non visibile, mostrato in MODO_STAMPE
+
+        ttk.Label(
+            self.frame_stampe,
+            text="Supporto Carta Minilab:",
+            style="Card.TLabel",
+            font=("Helvetica", 9, "bold")
+        ).pack(anchor="w", pady=(0, 6))
+
+        # Pillole / Radio per le 3 carte ufficiali minilab (Lucida, Satinata, Seta)
+        self.pills_carta_frame = ttk.Frame(self.frame_stampe, style="Card.TFrame")
+        self.pills_carta_frame.pack(fill="x", pady=(0, 6))
+        self.carta_buttons = {}
+
+        cols = 3
+        for idx, carta in enumerate(CARTE_FOTO):
+            btn = ttk.Button(
+                self.pills_carta_frame,
+                text=carta,
+                style="PillActive.TButton" if carta == CARTA_FOTO_DEFAULT else "Pill.TButton",
+                command=lambda c=carta: self.set_carta_minilab(c)
+            )
+            btn.grid(row=0, column=idx, padx=3, pady=2, sticky="nsew")
+            self.carta_buttons[carta] = btn
+            self.pills_carta_frame.grid_columnconfigure(idx, weight=1)
+
+        self.btn_applica_carta = ttk.Button(
+            self.frame_stampe,
+            text="⚡ Applica Carta a Tutte",
+            style="TButton",
+            command=self.applica_carta_a_tutte
+        )
+        self.btn_applica_carta.pack(fill="x", pady=(4, 0))
+
         self.set_modello(None)
+
+    def set_modalita(self, modalita: str):
+        self.modalita = modalita
+        if modalita == MODO_STAMPE:
+            self.config(text="Carta Fotografica (Minilab)")
+            self.frame_album.pack_forget()
+            self.frame_stampe.pack(fill="x")
+        else:
+            self.config(text="Carta & Campionario Colori Album")
+            self.frame_stampe.pack_forget()
+            self.frame_album.pack(fill="x")
+
+    def set_carta_minilab(self, carta: str):
+        self.carta_minilab_var.set(carta)
+        for c, btn in self.carta_buttons.items():
+            if c == carta:
+                btn.config(style="PillActive.TButton")
+            else:
+                btn.config(style="Pill.TButton")
+
+    def applica_carta_a_tutte(self):
+        """Assegna la carta minilab selezionata a tutte le foto caricate nell'ordine."""
+        if not self.main_app.foto_list:
+            messagebox.showinfo("Nessuna Foto", "Nessuna foto presente nell'ordine.")
+            return
+
+        carta_scelta = self.carta_minilab_var.get()
+        for f in self.main_app.foto_list:
+            f.materiale = carta_scelta
+
+        tot = len(self.main_app.foto_list)
+        messagebox.showinfo("Carta Minilab", f"Carta '{carta_scelta}' applicata con successo a tutte le {tot} foto.")
 
     def set_modello(self, modello: dict | None):
         """Filtra i campionari e colori consentiti per il modello specifico."""
+        if self.modalita == MODO_STAMPE:
+            return
+
         if modello and "campionari" in modello and modello["campionari"]:
             collezioni = modello["campionari"]
         else:
@@ -286,70 +447,145 @@ class MaterialiPanel(ttk.LabelFrame):
             self.colore_var.set("Standard")
 
     def get_materiale(self) -> str:
-        carta = self.tipo_carta_var.get()
-        coll = self.collezione_var.get()
-        col = self.colore_var.get()
-        return f"{carta} | {coll}: {col}"
+        if self.modalita == MODO_STAMPE:
+            return f"Carta {self.carta_minilab_var.get()}"
+        else:
+            carta = self.tipo_carta_album_var.get()
+            coll = self.collezione_var.get()
+            col = self.colore_var.get()
+            return f"{carta} | {coll}: {col}"
 
 
 # =============================================================================
-# 4. Pannello Dati Commessa & Personalizzazione Sposi
+# 4. Pannello Dati Commessa, Numero Busta Progressivo & Note Ergonomiche
 # =============================================================================
 class InfoOrdinePanel(ttk.LabelFrame):
-    """Pannello per dati cliente, busta, nomi sposi per incisione e note."""
+    """Pannello dati cliente, numero busta progressivo con controllo conflitti e note ben visibili."""
+
+    PLACEHOLDER_NOTE = "Inserisci qui note di laboratorio (es. bordino bianco 3mm, dettagli taglio, richieste particolari)..."
 
     def __init__(self, master, main_app):
-        super().__init__(master, text="Dati Commessa & Personalizzazione", padding=12)
+        super().__init__(master, text="Dati Commessa & Produzione", padding=12)
         self.main_app = main_app
+        self.modalita = MODO_ALBUM
 
         self.num_busta_var = tk.StringVar()
         self.codice_cliente_var = tk.StringVar()
         self.nome_cliente_var = tk.StringVar()
         self.nomi_sposi_var = tk.StringVar()
         self.correzione_var = tk.BooleanVar(value=False)
+        self._has_placeholder = True
 
         config = self.main_app.config_mgr.data
         self.codice_cliente_var.set(config.get("codice_cliente", ""))
-        self.num_busta_var.set(str(config.get("ultimo_num_busta", 1)))
 
-        # Griglia dati ordine
+        # Genera il primo numero busta libero
+        prossimo_num = self.main_app.config_mgr.trova_prossimo_num_busta()
+        self.num_busta_var.set(str(prossimo_num))
+
+        # --- Riga 1: Busta N° con controllo conflitti e tasto Prossimo Libero ---
         row1 = ttk.Frame(self, style="Card.TFrame")
         row1.pack(fill="x", pady=3)
-        ttk.Label(row1, text="Busta N°:", style="Card.TLabel").pack(side="left", padx=(0, 6))
-        entry_busta = ttk.Entry(row1, textvariable=self.num_busta_var, width=10, font=("Helvetica", 10, "bold"))
-        entry_busta.pack(side="left")
 
-        ttk.Label(row1, text="Cod. Fotografo:", style="Card.TLabel").pack(side="left", padx=(10, 6))
-        entry_cod = ttk.Entry(row1, textvariable=self.codice_cliente_var, width=10, font=("Helvetica", 10))
+        ttk.Label(row1, text="Busta N°:", style="Card.TLabel").pack(side="left", padx=(0, 6))
+        self.entry_busta = ttk.Entry(row1, textvariable=self.num_busta_var, width=8, font=("Helvetica", 10, "bold"))
+        self.entry_busta.pack(side="left")
+
+        btn_auto_busta = ttk.Button(
+            row1,
+            text="+ Libero",
+            width=7,
+            style="TButton",
+            command=self._imposta_prossimo_libero
+        )
+        btn_auto_busta.pack(side="left", padx=(4, 6))
+
+        # Indicatore visivo di conflitto numero busta
+        self.lbl_busta_status = tk.Label(
+            row1,
+            text="✓ Libero",
+            bg=BG_CARD,
+            fg=SUCCESS,
+            font=("Helvetica", 9, "bold")
+        )
+        self.lbl_busta_status.pack(side="left", padx=(2, 6))
+
+        # Codice Fotografo
+        ttk.Label(row1, text="Cod:", style="Card.TLabel").pack(side="left", padx=(6, 4))
+        entry_cod = ttk.Entry(row1, textvariable=self.codice_cliente_var, width=8, font=("Helvetica", 10))
         entry_cod.pack(side="left", fill="x", expand=True)
 
+        # Ascolta le modifiche al numero busta per rilevare conflitti in tempo reale
+        self.num_busta_var.trace_add("write", self._on_busta_changed)
+
+        # --- Riga 2: Nome Cliente / Riferimento ---
         row2 = ttk.Frame(self, style="Card.TFrame")
         row2.pack(fill="x", pady=4)
         ttk.Label(row2, text="Nome Cliente:", style="Card.TLabel").pack(side="left", padx=(0, 8))
         entry_nome = ttk.Entry(row2, textvariable=self.nome_cliente_var, font=("Helvetica", 10))
         entry_nome.pack(side="left", fill="x", expand=True)
 
-        # Campo dedicato ai nomi sposi (per incisione su cofanetto o copertina)
+        # --- Riga 3: Nomi Sposi (Incisione Album) ---
         self.row_sposi = ttk.Frame(self, style="Card.TFrame")
         self.row_sposi.pack(fill="x", pady=4)
         ttk.Label(self.row_sposi, text="Nomi Sposi (Incisione):", style="Card.TLabel").pack(side="left", padx=(0, 8))
         entry_sposi = ttk.Entry(self.row_sposi, textvariable=self.nomi_sposi_var, font=("Helvetica", 10))
         entry_sposi.pack(side="left", fill="x", expand=True)
 
-        # Note di laboratorio
-        ttk.Label(self, text="Note di Lavorazione:", style="Card.TLabel").pack(anchor="w", pady=(6, 2))
-        self.note_text = tk.Text(
-            self,
-            height=3,
-            bg=BG_INPUT,
-            fg=TEXT_PRIMARY,
-            insertbackground=TEXT_PRIMARY,
-            relief="flat",
-            highlightbackground=BORDER_COLOR,
-            highlightthickness=1,
-            font=("Helvetica", 10)
+        # --- Box Note di Lavorazione (Migliorato graficamente, alto e spazioso) ---
+        self.box_note_container = tk.Frame(self, bg=BG_CARD)
+        self.box_note_container.pack(fill="both", expand=True, pady=(6, 4))
+
+        hdr_note = tk.Frame(self.box_note_container, bg=BG_CARD)
+        hdr_note.pack(fill="x", pady=(0, 2))
+
+        ttk.Label(
+            hdr_note,
+            text="📝 Note di Lavorazione (Laboratorio):",
+            style="Card.TLabel",
+            font=("Helvetica", 9, "bold")
+        ).pack(side="left")
+
+        lbl_note_sub = tk.Label(
+            hdr_note,
+            text="(richieste speciali, tagli, finiture)",
+            bg=BG_CARD,
+            fg=TEXT_MUTED,
+            font=("Helvetica", 8)
         )
-        self.note_text.pack(fill="x", pady=(0, 4))
+        lbl_note_sub.pack(side="left", padx=(5, 0))
+
+        # Area di testo con bordo visibile e scrollbar ergonomica
+        notes_input_frame = tk.Frame(
+            self.box_note_container,
+            bg=BG_INPUT,
+            highlightbackground="#3E424D",
+            highlightcolor=PRIMARY,
+            highlightthickness=1,
+            bd=0
+        )
+        notes_input_frame.pack(fill="both", expand=True, pady=(2, 0))
+
+        self.note_scrollbar = ttk.Scrollbar(notes_input_frame, orient="vertical")
+        self.note_text = tk.Text(
+            notes_input_frame,
+            height=5,
+            bg=BG_INPUT,
+            fg=TEXT_MUTED,
+            insertbackground=PRIMARY,
+            relief="flat",
+            wrap="word",
+            font=("Helvetica", 10),
+            yscrollcommand=self.note_scrollbar.set
+        )
+        self.note_scrollbar.config(command=self.note_text.yview)
+
+        self.note_scrollbar.pack(side="right", fill="y")
+        self.note_text.pack(side="left", fill="both", expand=True, padx=6, pady=6)
+
+        self.note_text.insert("1.0", self.PLACEHOLDER_NOTE)
+        self.note_text.bind("<FocusIn>", self._on_note_focus_in)
+        self.note_text.bind("<FocusOut>", self._on_note_focus_out)
 
         # Checkbox correzione colore
         chk_corr = ttk.Checkbutton(
@@ -359,27 +595,74 @@ class InfoOrdinePanel(ttk.LabelFrame):
         )
         chk_corr.pack(anchor="w", pady=(4, 0))
 
-    def set_modello(self, modello: dict | None):
-        """Mostra o nasconde i campi personalizzati in base al modello scelto."""
-        if modello and modello.get("opzioni", {}).get("nomi_sposi"):
-            self.row_sposi.pack(fill="x", pady=3, before=self.note_text)
+        # Verifica iniziale stato busta
+        self._on_busta_changed()
+
+    def set_modalita(self, modalita: str):
+        self.modalita = modalita
+        if modalita == MODO_STAMPE:
+            self.config(text="Dati Commessa Stampe")
+            self.row_sposi.pack_forget()
         else:
-            pass  # Lasciamolo sempre disponibile per comodità
+            self.config(text="Dati Commessa Album")
+            self.row_sposi.pack(fill="x", pady=4, before=self.box_note_container)
+
+    def _imposta_prossimo_libero(self):
+        prossimo = self.main_app.config_mgr.trova_prossimo_num_busta()
+        self.num_busta_var.set(str(prossimo))
+
+    def _on_busta_changed(self, *args):
+        val = self.num_busta_var.get().strip()
+        if not val:
+            self.lbl_busta_status.config(text="⚠️ Vuoto", fg=ACCENT_AMBER)
+            return
+
+        in_conflitto = self.main_app.config_mgr.is_busta_in_conflitto(val)
+        if in_conflitto:
+            self.lbl_busta_status.config(text="⚠️ Già in uso", fg=ACCENT_AMBER)
+        else:
+            self.lbl_busta_status.config(text="✓ Libero", fg=SUCCESS)
+
+    def _on_note_focus_in(self, event):
+        if self._has_placeholder:
+            self.note_text.delete("1.0", "end")
+            self.note_text.config(fg=TEXT_PRIMARY)
+            self._has_placeholder = False
+
+    def _on_note_focus_out(self, event):
+        content = self.note_text.get("1.0", "end").strip()
+        if not content:
+            self.note_text.delete("1.0", "end")
+            self.note_text.insert("1.0", self.PLACEHOLDER_NOTE)
+            self.note_text.config(fg=TEXT_MUTED)
+            self._has_placeholder = True
+
+    def set_modello(self, modello: dict | None):
+        if self.modalita == MODO_STAMPE:
+            self.row_sposi.pack_forget()
+        else:
+            self.row_sposi.pack(fill="x", pady=4, before=self.box_note_container)
 
     def get_data(self) -> dict:
+        note_content = "" if self._has_placeholder else self.note_text.get("1.0", "end").strip()
         return {
             "num_busta": self.num_busta_var.get().strip() or "001",
             "codice_cliente": self.codice_cliente_var.get().strip(),
             "nome_cliente": self.nome_cliente_var.get().strip(),
-            "nomi_sposi": self.nomi_sposi_var.get().strip(),
-            "note": self.note_text.get("1.0", "end").strip(),
+            "nomi_sposi": self.nomi_sposi_var.get().strip() if self.modalita == MODO_ALBUM else "",
+            "note": note_content,
             "correzione": self.correzione_var.get(),
+            "modalita": self.modalita,
         }
 
     def reset_for_new_order(self):
         self.nome_cliente_var.set("")
         self.nomi_sposi_var.set("")
         self.note_text.delete("1.0", "end")
+        self.note_text.insert("1.0", self.PLACEHOLDER_NOTE)
+        self.note_text.config(fg=TEXT_MUTED)
+        self._has_placeholder = True
         self.correzione_var.set(False)
-        nuovo_num = self.main_app.config_mgr.genera_num_busta()
+
+        nuovo_num = self.main_app.config_mgr.trova_prossimo_num_busta()
         self.num_busta_var.set(str(nuovo_num))

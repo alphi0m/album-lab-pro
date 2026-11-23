@@ -85,6 +85,7 @@ class OrderExporter:
                 "codice_cliente": order_data.get("codice_cliente", ""),
                 "nome_cliente": order_data.get("nome_cliente", ""),
                 "nomi_sposi": order_data.get("nomi_sposi", ""),
+                "tipo_servizio": order_data.get("tipo_servizio", "STAMPA_ALBUM"),
                 "modello_id": order_data.get("modello_id", ""),
                 "modello_nome": order_data.get("modello_nome", ""),
                 "modello_cofanetto": order_data.get("modello_cofanetto", ""),

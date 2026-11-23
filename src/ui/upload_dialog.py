@@ -177,6 +177,7 @@ class UploadDialog(tk.Toplevel):
         tot_copie = sum(f.quantita for f in self.foto_list)
         busta = self.order_data.get("num_busta", "—")
         cliente = f"{self.order_data.get('nome_cliente', '—')} (Cod. {self.order_data.get('codice_cliente', '—')})"
+        tipo_servizio = self.order_data.get("tipo_servizio", "STAMPA_ALBUM")
         modello = self.order_data.get("modello_nome") or "Stampe Libere"
         formato = self.order_data.get("formato") or "—"
         materiale = self.order_data.get("materiale") or "—"
@@ -184,10 +185,14 @@ class UploadDialog(tk.Toplevel):
 
         add_info_row(0, "Busta N°:", str(busta), bold=True)
         add_info_row(1, "Committente:", cliente)
-        add_info_row(2, "Modello Album:", modello, color="#66B2FF", bold=True)
-        add_info_row(3, "Formato & Copertina:", f"{formato}  |  {materiale}")
-        if sposi != "—":
-            add_info_row(4, "Incisione Sposi:", sposi, color="#F1C40F")
+        if tipo_servizio == "STAMPE_FOTO" or self.order_data.get("modello_id") == "stampe_singole":
+            add_info_row(2, "Tipo Lavorazione:", "Stampe Fotografiche Singole", color="#2ECC71", bold=True)
+            add_info_row(3, "Formato & Carta:", f"{formato}  |  {materiale}")
+        else:
+            add_info_row(2, "Modello Album:", modello, color="#66B2FF", bold=True)
+            add_info_row(3, "Formato & Copertina:", f"{formato}  |  {materiale}")
+            if sposi != "—":
+                add_info_row(4, "Incisione Sposi:", sposi, color="#F1C40F")
         add_info_row(5, "Scatti & Risoluzione:", f"{len(self.foto_list)} foto ({tot_copie} copie) a 300 DPI con ICC", color=SUCCESS)
 
         # 3. Sezione Avanzamento / Progress

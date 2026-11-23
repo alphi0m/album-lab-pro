@@ -46,6 +46,7 @@ tools/
 # Backup e File Legacy Archiviati
 # ==========================================
 _legacy/
+_reference_dp_app/
 
 # ==========================================
 # Sistema Operativo e IDE

@@ -20,6 +20,9 @@ class EditorPanel(tk.Frame):
         # Stato editor
         self.current_foto = None
         self.tk_image = None
+        self.base_resized = None
+        self.dimmed_base = None
+        self._dim_lut = [int(p * 0.42) for p in range(256)] * 3
         self.img_scale = 1.0
         self.img_x = 0
         self.img_y = 0
@@ -77,6 +80,8 @@ class EditorPanel(tk.Frame):
     def clear(self):
         self.current_foto = None
         self.crop_coords = None
+        self.base_resized = None
+        self.dimmed_base = None
         self.canvas.delete("all")
         self.lbl_info.config(text="Nessuna foto selezionata")
 
@@ -120,11 +125,13 @@ class EditorPanel(tk.Frame):
         self.img_x = (canvas_w - self.display_w) // 2
         self.img_y = (canvas_h - self.display_h) // 2
 
-        resized = self.current_foto.image_orig.resize(
+        self.base_resized = self.current_foto.image_orig.resize(
             (self.display_w, self.display_h),
             Image.Resampling.BILINEAR
         )
-        self.tk_image = ImageTk.PhotoImage(resized)
+        # Pre-calcolo dello sfondo oscurato (LUT ~42%) per maschera semi-trasparente
+        self.dimmed_base = self.base_resized.point(self._dim_lut)
+        self.tk_image = ImageTk.PhotoImage(self.base_resized)
 
         self.canvas.delete("all")
 
@@ -224,35 +231,43 @@ class EditorPanel(tk.Frame):
         ix, iy = self.img_x, self.img_y
         iw, ih = self.display_w, self.display_h
 
-        # Maschera oscurata esterna
-        mask_color = "#000000"
-        stipple = "gray50"
+        # Maschera semi-trasparente / opaca sulle parti escluse:
+        # L'area scartata rimane visibile ma oscurata (LUT ~42% luminosità),
+        # mentre l'area attiva di ritaglio rimane nitida e al 100% di luminosità.
+        if self.dimmed_base and self.base_resized:
+            rx1 = max(0, min(iw, int(round(min(x1, x2) - ix))))
+            ry1 = max(0, min(ih, int(round(min(y1, y2) - iy))))
+            rx2 = max(0, min(iw, int(round(max(x1, x2) - ix))))
+            ry2 = max(0, min(ih, int(round(max(y1, y2) - iy))))
 
-        if y1 > iy:
-            self.canvas.create_rectangle(ix, iy, ix + iw, y1, fill=mask_color, stipple=stipple, width=0, tags="overlay")
-        if y2 < iy + ih:
-            self.canvas.create_rectangle(ix, y2, ix + iw, iy + ih, fill=mask_color, stipple=stipple, width=0, tags="overlay")
-        if x1 > ix:
-            self.canvas.create_rectangle(ix, max(iy, y1), x1, min(iy + ih, y2), fill=mask_color, stipple=stipple, width=0, tags="overlay")
-        if x2 < ix + iw:
-            self.canvas.create_rectangle(x2, max(iy, y1), ix + iw, min(iy + ih, y2), fill=mask_color, stipple=stipple, width=0, tags="overlay")
+            if rx2 > rx1 and ry2 > ry1:
+                composite = self.dimmed_base.copy()
+                crop_part = self.base_resized.crop((rx1, ry1, rx2, ry2))
+                composite.paste(crop_part, (rx1, ry1))
+                self.tk_image = ImageTk.PhotoImage(composite)
+                self.canvas.itemconfig("foto", image=self.tk_image)
+            else:
+                self.tk_image = ImageTk.PhotoImage(self.base_resized)
+                self.canvas.itemconfig("foto", image=self.tk_image)
 
-        # Bordo ritaglio nitido con doppio contorno
+        # Bordo ritaglio nitido con contorno blu
         self.canvas.create_rectangle(x1, y1, x2, y2, outline="#0078FF", width=2, tags="overlay")
 
         # Regola dei Terzi (linee tratteggiate bianche sottili)
-        cw = x2 - x1
-        ch = y2 - y1
+        cw = abs(x2 - x1)
+        ch = abs(y2 - y1)
+        min_x = min(x1, x2)
+        min_y = min(y1, y2)
         if cw > 40 and ch > 40:
             grid_color = "#FFFFFF"
-            self.canvas.create_line(x1 + cw / 3, y1, x1 + cw / 3, y2, fill=grid_color, dash=(2, 4), tags="overlay")
-            self.canvas.create_line(x1 + (2 * cw / 3), y1, x1 + (2 * cw / 3), y2, fill=grid_color, dash=(2, 4), tags="overlay")
-            self.canvas.create_line(x1, y1 + ch / 3, x2, y1 + ch / 3, fill=grid_color, dash=(2, 4), tags="overlay")
-            self.canvas.create_line(x1, y1 + (2 * ch / 3), x2, y1 + (2 * ch / 3), fill=grid_color, dash=(2, 4), tags="overlay")
+            self.canvas.create_line(min_x + cw / 3, min_y, min_x + cw / 3, min_y + ch, fill=grid_color, dash=(2, 4), tags="overlay")
+            self.canvas.create_line(min_x + (2 * cw / 3), min_y, min_x + (2 * cw / 3), min_y + ch, fill=grid_color, dash=(2, 4), tags="overlay")
+            self.canvas.create_line(min_x, min_y + ch / 3, min_x + cw, min_y + ch / 3, fill=grid_color, dash=(2, 4), tags="overlay")
+            self.canvas.create_line(min_x, min_y + (2 * ch / 3), min_x + cw, min_y + (2 * ch / 3), fill=grid_color, dash=(2, 4), tags="overlay")
 
         # Maniglie angolari visibili
         handle_size = 5
-        for hx, hy in [(x1, y1), (x2, y1), (x1, y2), (x2, y2)]:
+        for hx, hy in [(min_x, min_y), (min_x + cw, min_y), (min_x, min_y + ch), (min_x + cw, min_y + ch)]:
             self.canvas.create_rectangle(
                 hx - handle_size, hy - handle_size,
                 hx + handle_size, hy + handle_size,

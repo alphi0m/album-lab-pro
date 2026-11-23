@@ -5,7 +5,7 @@ Finestra principale dell'applicazione Album Lab Pro con integrazione catalogo vi
 import sys
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
-from src.core.constants import FORMATI, FILETYPES_FOTO, BASE_DIR
+from src.core.constants import FORMATI, FILETYPES_FOTO, BASE_DIR, MODO_ALBUM, MODO_STAMPE
 from src.core.config import ConfigManager, open_folder
 from src.core.models import FotoItem
 from src.core.catalog import MODELLI_ALBUM, get_modello_by_id
@@ -34,6 +34,7 @@ class MainApp:
         self.foto_list = []
         self.foto_corrente_index = None
         self.modello_selezionato = None
+        self.modalita = MODO_ALBUM
 
         # Applica il tema Dark Studio
         apply_dark_studio_theme(self.root)
@@ -107,35 +108,83 @@ class MainApp:
         toolbar = tk.Frame(self.root, bg="#1E2025", height=50, highlightbackground=BORDER_COLOR, highlightthickness=1)
         toolbar.pack(fill="x", side="top")
 
-        # Pulsanti Toolbar con accesso rapido al Catalogo
-        ttk.Button(toolbar, text="📖 Sfoglia Catalogo Album", style="Primary.TButton",
-                   command=self.apri_catalogo).pack(side="left", padx=(10, 5), pady=6)
+        # Selettore Modalità di Lavoro Duale (Segmented Control Studio)
+        mode_box = tk.Frame(toolbar, bg="#141518", highlightbackground=BORDER_COLOR, highlightthickness=1)
+        mode_box.pack(side="left", padx=(10, 8), pady=6)
+
+        self.btn_modo_album = ttk.Button(
+            mode_box,
+            text="📖 Stampa Album",
+            style="Primary.TButton",
+            command=lambda: self.imposta_modalita(MODO_ALBUM)
+        )
+        self.btn_modo_album.pack(side="left", padx=2, pady=2)
+
+        self.btn_modo_stampe = ttk.Button(
+            mode_box,
+            text="🖼️ Stampe Singole",
+            style="TButton",
+            command=lambda: self.imposta_modalita(MODO_STAMPE)
+        )
+        self.btn_modo_stampe.pack(side="left", padx=2, pady=2)
+
+        ttk.Separator(toolbar, orient="vertical").pack(side="left", fill="y", padx=6, pady=8)
+
+        # Pulsanti Toolbar con accesso al Catalogo
+        self.btn_catalogo = ttk.Button(
+            toolbar, text="📖 Sfoglia Catalogo", style="TButton",
+            command=self.apri_catalogo
+        )
+        self.btn_catalogo.pack(side="left", padx=4, pady=6)
 
         ttk.Button(toolbar, text="📂 Carica Foto (Ctrl+O)", style="TButton",
-                   command=self.carica_foto_multiple).pack(side="left", padx=5, pady=6)
+                   command=self.carica_foto_multiple).pack(side="left", padx=4, pady=6)
 
         ttk.Button(toolbar, text="🔄 Ruota Crop (R)", style="TButton",
-                   command=self.flip_crop).pack(side="left", padx=5, pady=6)
+                   command=self.flip_crop).pack(side="left", padx=4, pady=6)
 
         ttk.Button(toolbar, text="🗑️ Rimuovi Foto", style="TButton",
-                   command=self.cancella_foto_selezionate).pack(side="left", padx=5, pady=6)
+                   command=self.cancella_foto_selezionate).pack(side="left", padx=4, pady=6)
 
-        ttk.Separator(toolbar, orient="vertical").pack(side="left", fill="y", padx=10, pady=8)
+        ttk.Separator(toolbar, orient="vertical").pack(side="left", fill="y", padx=8, pady=8)
 
         ttk.Button(toolbar, text="✨ Nuovo Ordine", style="TButton",
-                   command=self.nuovo_ordine).pack(side="left", padx=5, pady=6)
+                   command=self.nuovo_ordine).pack(side="left", padx=4, pady=6)
 
         # Pulsanti Azione Ordine a destra
         ttk.Button(toolbar, text="🚀 INVIA AL LABORATORIO", style="Primary.TButton",
-                   command=self.invia_al_laboratorio).pack(side="right", padx=(5, 12), pady=6)
+                   command=self.invia_al_laboratorio).pack(side="right", padx=(4, 12), pady=6)
 
         ttk.Button(toolbar, text="💾 Salva Locale (Ctrl+S)", style="Success.TButton",
-                   command=self.salva_ordine).pack(side="right", padx=5, pady=6)
+                   command=self.salva_ordine).pack(side="right", padx=4, pady=6)
+
+    def imposta_modalita(self, modalita: str):
+        """Commuta la modalità di lavoro tra 'Stampa Album' e 'Stampe Singole'."""
+        self.modalita = modalita
+        if modalita == MODO_STAMPE:
+            self.btn_modo_stampe.config(style="Primary.TButton")
+            self.btn_modo_album.config(style="TButton")
+            self.btn_catalogo.config(state="disabled")
+        else:
+            self.btn_modo_album.config(style="Primary.TButton")
+            self.btn_modo_stampe.config(style="TButton")
+            self.btn_catalogo.config(state="normal")
+
+        # Propaga la modalità ai pannelli laterali
+        self.modello_panel.set_modalita(modalita)
+        self.formati_panel.set_modalita(modalita)
+        self.materiali_panel.set_modalita(modalita)
+        self.info_panel.set_modalita(modalita)
+
+        self._aggiorna_stats()
 
     def _crea_menu_bar(self):
         menubar = tk.Menu(self.root)
 
         menu_file = tk.Menu(menubar, tearoff=0)
+        menu_file.add_command(label="Modalità: 📖 Stampa Album", command=lambda: self.imposta_modalita(MODO_ALBUM))
+        menu_file.add_command(label="Modalità: 🖼️ Stampe Singole", command=lambda: self.imposta_modalita(MODO_STAMPE))
+        menu_file.add_separator()
         menu_file.add_command(label="Sfoglia Catalogo Album...", command=self.apri_catalogo)
         menu_file.add_command(label="Carica Foto... (Ctrl+O)", command=self.carica_foto_multiple)
         menu_file.add_separator()
@@ -353,8 +402,15 @@ class MainApp:
     def _aggiorna_stats(self):
         tot_foto = len(self.foto_list)
         tot_copie = sum(f.quantita for f in self.foto_list)
-        mod_nome = self.modello_selezionato["nome"] if self.modello_selezionato else "Nessun modello"
-        self.lbl_stats.config(text=f"Modello: {mod_nome}   |   {tot_foto} foto caricate   |   {tot_copie} copie totali")
+        if self.modalita == MODO_STAMPE:
+            self.lbl_stats.config(
+                text=f"Modalità: Stampe Fotografiche Singole   |   {tot_foto} foto caricate   |   {tot_copie} stampe totali"
+            )
+        else:
+            mod_nome = self.modello_selezionato["nome"] if self.modello_selezionato else "Nessun modello"
+            self.lbl_stats.config(
+                text=f"Stampa Album: {mod_nome}   |   {tot_foto} foto caricate   |   {tot_copie} copie totali"
+            )
 
     # -------------------------------------------------------------------------
     # Salvataggio Ordine & Archivio
@@ -365,22 +421,59 @@ class MainApp:
             return
 
         dati_commessa = self.info_panel.get_data()
+        num_busta = dati_commessa["num_busta"]
+
+        # Controllo conflitti numero busta prima del salvataggio
+        if self.config_mgr.is_busta_in_conflitto(num_busta):
+            prossimo = self.config_mgr.trova_prossimo_num_busta()
+            risposta = messagebox.askyesnocancel(
+                "Conflitto Numero Busta",
+                f"La busta N° '{num_busta}' esiste già nell'archivio locale delle commesse.\n\n"
+                f"Vuoi assegnare automaticamente il prossimo numero disponibile ({prossimo})?\n\n"
+                f"• Clicca 'Sì' per usare la nuova busta N° {prossimo}\n"
+                f"• Clicca 'No' per sovrascrivere la commessa archiviata\n"
+                f"• Clicca 'Annulla' per correggere manualmente il numero"
+            )
+            if risposta is None:
+                return  # Annulla l'operazione
+            elif risposta is True:
+                num_busta = str(prossimo)
+                dati_commessa["num_busta"] = num_busta
+                self.info_panel.num_busta_var.set(num_busta)
+
         dati_commessa["formato"] = self.formati_panel.get_formato()
         dati_commessa["materiale"] = self.materiali_panel.get_materiale()
 
-        # Dati del catalogo
-        if self.modello_selezionato:
-            dati_commessa["modello_id"] = self.modello_selezionato.get("id")
-            dati_commessa["modello_nome"] = self.modello_selezionato.get("nome")
-            dati_commessa["modello_cofanetto"] = self.modello_selezionato.get("cofanetto")
+        if self.modalita == MODO_STAMPE:
+            dati_commessa["tipo_servizio"] = "STAMPE_FOTO"
+            dati_commessa["modello_id"] = "stampe_singole"
+            dati_commessa["modello_nome"] = "Stampe Fotografiche Singole"
+            dati_commessa["modello_cofanetto"] = "Nessuno (Stampe Sciolte)"
+        else:
+            dati_commessa["tipo_servizio"] = "STAMPA_ALBUM"
+            if self.modello_selezionato:
+                dati_commessa["modello_id"] = self.modello_selezionato.get("id")
+                dati_commessa["modello_nome"] = self.modello_selezionato.get("nome")
+                dati_commessa["modello_cofanetto"] = self.modello_selezionato.get("cofanetto")
+            else:
+                dati_commessa["modello_id"] = ""
+                dati_commessa["modello_nome"] = "Album Standard"
+                dati_commessa["modello_cofanetto"] = ""
 
         self.config_mgr.set("codice_cliente", dati_commessa["codice_cliente"])
 
         ok, res_path = OrderExporter.salva_ordine(dati_commessa, self.foto_list, self.config_mgr.data)
 
         if ok:
-            num_busta = dati_commessa["num_busta"]
-            msg = f"Ordine Busta {num_busta} salvato con successo!\n\nCartella di produzione:\n{res_path}\n\nVuoi aprire la cartella dell'ordine adesso?"
+            # Aggiorna progressivo in configurazione se numerico
+            try:
+                num_int = int(num_busta)
+                if num_int >= self.config_mgr.get("ultimo_num_busta", 1):
+                    self.config_mgr.set("ultimo_num_busta", num_int + 1)
+            except ValueError:
+                pass
+
+            msg = f"Commessa Busta N° {num_busta} salvata con successo!\n\nCartella di produzione:\n{res_path}\n\nVuoi aprire la cartella dell'ordine adesso?"
             if messagebox.askyesno("Ordine Salvato", msg):
                 open_folder(res_path)
 
@@ -394,25 +487,62 @@ class MainApp:
             messagebox.showwarning("Nessuna Foto", "Carica almeno una foto prima di inviare l'ordine al laboratorio.")
             return
 
-        if not self.modello_selezionato:
-            conferma = messagebox.askyesno(
-                "Nessun Modello Selezionato",
-                "Non hai selezionato alcun modello di album dal catalogo.\n\nVuoi procedere comunque come stampe sciolte?",
-                icon="question"
-            )
-            if not conferma:
-                self.apri_catalogo()
-                return
-
         dati_commessa = self.info_panel.get_data()
+        num_busta = dati_commessa["num_busta"]
+
+        # Controllo conflitti numero busta
+        if self.config_mgr.is_busta_in_conflitto(num_busta):
+            prossimo = self.config_mgr.trova_prossimo_num_busta()
+            risposta = messagebox.askyesnocancel(
+                "Conflitto Numero Busta",
+                f"La busta N° '{num_busta}' esiste già nell'archivio ordini.\n\n"
+                f"Vuoi assegnare automaticamente il prossimo numero disponibile ({prossimo})?\n\n"
+                f"• Clicca 'Sì' per usare la busta N° {prossimo}\n"
+                f"• Clicca 'No' per inviare comunque con questo numero\n"
+                f"• Clicca 'Annulla' per correggere manualmente il numero"
+            )
+            if risposta is None:
+                return
+            elif risposta is True:
+                num_busta = str(prossimo)
+                dati_commessa["num_busta"] = num_busta
+                self.info_panel.num_busta_var.set(num_busta)
+
+        if self.modalita == MODO_STAMPE:
+            dati_commessa["tipo_servizio"] = "STAMPE_FOTO"
+            dati_commessa["modello_id"] = "stampe_singole"
+            dati_commessa["modello_nome"] = "Stampe Fotografiche Singole"
+            dati_commessa["modello_cofanetto"] = "Nessuno (Stampe Sciolte)"
+        else:
+            dati_commessa["tipo_servizio"] = "STAMPA_ALBUM"
+            if not self.modello_selezionato:
+                risposta = messagebox.askyesnocancel(
+                    "Nessun Modello Album Selezionato",
+                    "Sei in modalità 'Stampa Album' ma non hai scelto alcun modello dal catalogo.\n\n"
+                    "• Clicca 'Sì' per aprire il catalogo e selezionare un modello\n"
+                    "• Clicca 'No' per inviare la commessa come 'Stampe Fotografiche Singole'\n"
+                    "• Clicca 'Annulla' per fermarti",
+                    icon="question"
+                )
+                if risposta is None:
+                    return
+                elif risposta is True:
+                    self.apri_catalogo()
+                    return
+                else:
+                    self.imposta_modalita(MODO_STAMPE)
+                    dati_commessa["tipo_servizio"] = "STAMPE_FOTO"
+                    dati_commessa["modello_id"] = "stampe_singole"
+                    dati_commessa["modello_nome"] = "Stampe Fotografiche Singole"
+                    dati_commessa["modello_cofanetto"] = "Nessuno (Stampe Sciolte)"
+
+            if self.modello_selezionato:
+                dati_commessa["modello_id"] = self.modello_selezionato.get("id")
+                dati_commessa["modello_nome"] = self.modello_selezionato.get("nome")
+                dati_commessa["modello_cofanetto"] = self.modello_selezionato.get("cofanetto")
+
         dati_commessa["formato"] = self.formati_panel.get_formato()
         dati_commessa["materiale"] = self.materiali_panel.get_materiale()
-
-        # Dati del catalogo
-        if self.modello_selezionato:
-            dati_commessa["modello_id"] = self.modello_selezionato.get("id")
-            dati_commessa["modello_nome"] = self.modello_selezionato.get("nome")
-            dati_commessa["modello_cofanetto"] = self.modello_selezionato.get("cofanetto")
 
         self.config_mgr.set("codice_cliente", dati_commessa["codice_cliente"])
 
@@ -425,6 +555,12 @@ class MainApp:
 
     def _on_ordine_inviato(self, order_id: str):
         """Eseguito al termine dell'invio con successo al laboratorio."""
+        try:
+            curr_busta = int(self.info_panel.num_busta_var.get().strip())
+            if curr_busta >= self.config_mgr.get("ultimo_num_busta", 1):
+                self.config_mgr.set("ultimo_num_busta", curr_busta + 1)
+        except ValueError:
+            pass
         self.info_panel.reset_for_new_order()
 
     def nuovo_ordine(self):
@@ -442,9 +578,7 @@ class MainApp:
         self.modello_selezionato = None
         self.editor_panel.clear()
         self.miniature_panel.set_foto_items([])
-        self.modello_panel.set_modello(None)
-        self.formati_panel.set_modello(None)
-        self.materiali_panel.set_modello(None)
+        self.imposta_modalita(self.modalita)
         self.info_panel.reset_for_new_order()
         self._aggiorna_stats()
 
