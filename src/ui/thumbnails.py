@@ -76,8 +76,6 @@ class MiniaturePanel(tk.Frame):
 
         self.inner_frame.bind("<Configure>", self._on_inner_configure)
         self.canvas.bind("<Configure>", self._on_canvas_configure)
-        self.canvas.bind("<Enter>", lambda e: self.canvas.bind_all("<MouseWheel>", self._on_mousewheel))
-        self.canvas.bind("<Leave>", lambda e: self.canvas.unbind_all("<MouseWheel>"))
 
     def _on_inner_configure(self, event):
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))

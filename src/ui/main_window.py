@@ -50,6 +50,7 @@ class MainApp:
 
         # Registrazione scorciatoie
         self._registra_scorciatoie()
+        self._setup_mousewheel()
 
     # -------------------------------------------------------------------------
     # Icona Applicazione
@@ -227,27 +228,46 @@ class MainApp:
         self.editor_panel.pack(fill="both", expand=True)
         main_pane.add(center_frame, weight=3)
 
-        # 3. Colonna Destra: Catalogo, Formati, Materiali e Dati Commessa
-        right_frame = ttk.Frame(main_pane, width=390, style="Card.TFrame")
-        right_frame.pack_propagate(False)
+        # 3. Colonna Destra: Catalogo, Formati, Materiali e Dati Commessa (con scroll fluido)
+        self.right_outer = ttk.Frame(main_pane, width=410, style="Card.TFrame")
+        self.right_outer.pack_propagate(False)
+
+        self.right_canvas = tk.Canvas(self.right_outer, bg=BG_APP, highlightthickness=0)
+        self.right_scrollbar = ttk.Scrollbar(self.right_outer, orient="vertical", command=self.right_canvas.yview)
+        self.right_canvas.configure(yscrollcommand=self.right_scrollbar.set)
+
+        self.right_scrollbar.pack(side="right", fill="y")
+        self.right_canvas.pack(side="left", fill="both", expand=True)
+
+        self.right_content = ttk.Frame(self.right_canvas, style="Card.TFrame")
+        self.right_window = self.right_canvas.create_window((0, 0), window=self.right_content, anchor="nw")
+
+        def _on_right_content_configure(event):
+            self.right_canvas.configure(scrollregion=self.right_canvas.bbox("all"))
+
+        def _on_right_canvas_configure(event):
+            self.right_canvas.itemconfig(self.right_window, width=event.width)
+
+        self.right_content.bind("<Configure>", _on_right_content_configure)
+        self.right_canvas.bind("<Configure>", _on_right_canvas_configure)
 
         # Selettore Modello Album
-        self.modello_panel = ModelloPanel(right_frame, self)
+        self.modello_panel = ModelloPanel(self.right_content, self)
         self.modello_panel.pack(fill="x", pady=4, padx=6)
 
         # Pannello Formati (vincolato al modello)
-        self.formati_panel = FormatiPanel(right_frame, self)
+        self.formati_panel = FormatiPanel(self.right_content, self)
         self.formati_panel.pack(fill="x", pady=4, padx=6)
 
         # Pannello Materiali (campionari colore reali)
-        self.materiali_panel = MaterialiPanel(right_frame, self)
+        self.materiali_panel = MaterialiPanel(self.right_content, self)
         self.materiali_panel.pack(fill="x", pady=4, padx=6)
 
         # Pannello Dati Commessa & Sposi
-        self.info_panel = InfoOrdinePanel(right_frame, self)
-        self.info_panel.pack(fill="both", expand=True, pady=4, padx=6)
+        self.info_panel = InfoOrdinePanel(self.right_content, self)
+        self.info_panel.pack(fill="x", pady=4, padx=6)
 
-        main_pane.add(right_frame, weight=1)
+        main_pane.add(self.right_outer, weight=1)
 
     # -------------------------------------------------------------------------
     # Selezione & Vincolo Catalogo
@@ -313,6 +333,53 @@ class MainApp:
         self.root.bind(f"<{ctrl}-O>", lambda e: self._safe_action(self.carica_foto_multiple))
         self.root.bind(f"<{ctrl}-a>", lambda e: self._safe_action(self.seleziona_tutto))
         self.root.bind(f"<{ctrl}-A>", lambda e: self._safe_action(self.seleziona_tutto))
+
+    def _setup_mousewheel(self):
+        """Gestore unificato e fluido della rotellina del mouse senza conflitti enter/leave."""
+        def _on_global_mousewheel(event):
+            try:
+                w = self.root.winfo_containing(event.x_root, event.y_root)
+                if not w:
+                    return
+
+                # Se il mouse si trova dentro un'area di testo (es. Note), lasciamo lo scroll nativo del Text
+                if isinstance(w, tk.Text):
+                    return
+
+                delta = 0
+                if hasattr(event, "delta") and event.delta != 0:
+                    delta = -1 if event.delta > 0 else 1
+                elif event.num == 4:
+                    delta = -1
+                elif event.num == 5:
+                    delta = 1
+
+                if delta == 0:
+                    return
+
+                # Risali la gerarchia per identificare se il cursore è sulla colonna destra o sulle miniature
+                curr = w
+                is_right = False
+                is_thumbs = False
+                while curr:
+                    if hasattr(self, "right_outer") and curr == self.right_outer:
+                        is_right = True
+                        break
+                    if hasattr(self, "miniature_panel") and curr == self.miniature_panel:
+                        is_thumbs = True
+                        break
+                    curr = getattr(curr, "master", None)
+
+                if is_right and hasattr(self, "right_canvas"):
+                    self.right_canvas.yview_scroll(delta * 2, "units")
+                elif is_thumbs and hasattr(self, "miniature_panel"):
+                    self.miniature_panel.canvas.yview_scroll(delta * 2, "units")
+            except Exception:
+                pass
+
+        self.root.bind_all("<MouseWheel>", _on_global_mousewheel)
+        self.root.bind_all("<Button-4>", _on_global_mousewheel)
+        self.root.bind_all("<Button-5>", _on_global_mousewheel)
 
     # -------------------------------------------------------------------------
     # Formato e Ritaglio

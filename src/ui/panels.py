@@ -527,17 +527,17 @@ class InfoOrdinePanel(ttk.LabelFrame):
 
         # --- Riga 3: Nomi Sposi (Incisione Album) ---
         self.row_sposi = ttk.Frame(self, style="Card.TFrame")
-        self.row_sposi.pack(fill="x", pady=4)
+        self.row_sposi.pack(fill="x", pady=(4, 6))
         ttk.Label(self.row_sposi, text="Nomi Sposi (Incisione):", style="Card.TLabel").pack(side="left", padx=(0, 8))
         entry_sposi = ttk.Entry(self.row_sposi, textvariable=self.nomi_sposi_var, font=("Helvetica", 10))
         entry_sposi.pack(side="left", fill="x", expand=True)
 
         # --- Box Note di Lavorazione (Migliorato graficamente, alto e spazioso) ---
         self.box_note_container = tk.Frame(self, bg=BG_CARD)
-        self.box_note_container.pack(fill="both", expand=True, pady=(6, 4))
+        self.box_note_container.pack(fill="x", pady=(8, 4))
 
         hdr_note = tk.Frame(self.box_note_container, bg=BG_CARD)
-        hdr_note.pack(fill="x", pady=(0, 2))
+        hdr_note.pack(fill="x", pady=(0, 4))
 
         ttk.Label(
             hdr_note,
@@ -548,9 +548,9 @@ class InfoOrdinePanel(ttk.LabelFrame):
 
         lbl_note_sub = tk.Label(
             hdr_note,
-            text="(richieste speciali, tagli, finiture)",
+            text="(richieste speciali, finiture)",
             bg=BG_CARD,
-            fg=TEXT_MUTED,
+            fg="#9AA0B0",
             font=("Helvetica", 8)
         )
         lbl_note_sub.pack(side="left", padx=(5, 0))
@@ -558,21 +558,21 @@ class InfoOrdinePanel(ttk.LabelFrame):
         # Area di testo con bordo visibile e scrollbar ergonomica
         notes_input_frame = tk.Frame(
             self.box_note_container,
-            bg=BG_INPUT,
-            highlightbackground="#3E424D",
+            bg="#181A20",
+            highlightbackground="#4A5263",
             highlightcolor=PRIMARY,
             highlightthickness=1,
             bd=0
         )
-        notes_input_frame.pack(fill="both", expand=True, pady=(2, 0))
+        notes_input_frame.pack(fill="x", pady=(2, 0))
 
         self.note_scrollbar = ttk.Scrollbar(notes_input_frame, orient="vertical")
         self.note_text = tk.Text(
             notes_input_frame,
-            height=5,
-            bg=BG_INPUT,
-            fg=TEXT_MUTED,
-            insertbackground=PRIMARY,
+            height=4,
+            bg="#181A20",
+            fg="#A0A6B8",
+            insertbackground="#FFFFFF",
             relief="flat",
             wrap="word",
             font=("Helvetica", 10),
@@ -581,7 +581,7 @@ class InfoOrdinePanel(ttk.LabelFrame):
         self.note_scrollbar.config(command=self.note_text.yview)
 
         self.note_scrollbar.pack(side="right", fill="y")
-        self.note_text.pack(side="left", fill="both", expand=True, padx=6, pady=6)
+        self.note_text.pack(side="left", fill="both", expand=True, padx=8, pady=6)
 
         self.note_text.insert("1.0", self.PLACEHOLDER_NOTE)
         self.note_text.bind("<FocusIn>", self._on_note_focus_in)
@@ -626,7 +626,7 @@ class InfoOrdinePanel(ttk.LabelFrame):
     def _on_note_focus_in(self, event):
         if self._has_placeholder:
             self.note_text.delete("1.0", "end")
-            self.note_text.config(fg=TEXT_PRIMARY)
+            self.note_text.config(fg="#FFFFFF")
             self._has_placeholder = False
 
     def _on_note_focus_out(self, event):
@@ -634,7 +634,7 @@ class InfoOrdinePanel(ttk.LabelFrame):
         if not content:
             self.note_text.delete("1.0", "end")
             self.note_text.insert("1.0", self.PLACEHOLDER_NOTE)
-            self.note_text.config(fg=TEXT_MUTED)
+            self.note_text.config(fg="#A0A6B8")
             self._has_placeholder = True
 
     def set_modello(self, modello: dict | None):
@@ -660,7 +660,7 @@ class InfoOrdinePanel(ttk.LabelFrame):
         self.nomi_sposi_var.set("")
         self.note_text.delete("1.0", "end")
         self.note_text.insert("1.0", self.PLACEHOLDER_NOTE)
-        self.note_text.config(fg=TEXT_MUTED)
+        self.note_text.config(fg="#A0A6B8")
         self._has_placeholder = True
         self.correzione_var.set(False)
 

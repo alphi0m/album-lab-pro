@@ -5,7 +5,7 @@ Fornisce le API REST per la ricezione degli ordini e la dashboard di produzione 
 
 import json
 from pathlib import Path
-from flask import Flask, request, jsonify, send_file, send_from_directory, render_template_string, redirect, url_for
+from flask import Flask, request, jsonify, send_file, send_from_directory, render_template_string, redirect, url_for, make_response
 from src.core.catalog import MODELLI_ALBUM, CAMPIONARI_COLORI
 from src.server.storage import ServerStorage, SERVER_ORDERS_DIR
 
@@ -85,7 +85,68 @@ DASHBOARD_HTML = """
         .btn-danger { background: rgba(231, 76, 60, 0.2); color: #E74C3C; border: 1px solid rgba(231, 76, 60, 0.4); }
         .btn-danger:hover { background: #E74C3C; color: #fff; }
 
-        select.status-select { background: #18191C; color: var(--text-main); border: 1px solid var(--border); padding: 5px 8px; border-radius: 5px; font-size: 0.8rem; cursor: pointer; transition: border-color 0.2s; }
+        select.status-select { 
+            background: #18191C; 
+            color: var(--text-main); 
+            border: 1px solid var(--border); 
+            padding: 6px 10px; 
+            border-radius: 6px; 
+            font-size: 0.82rem; 
+            font-weight: 600;
+            cursor: pointer; 
+            outline: none;
+            transition: all 0.2s ease; 
+        }
+        select.status-select[data-current="IN ATTESA"] {
+            border-color: #F39C12;
+            background: rgba(243, 156, 18, 0.12);
+            color: #F39C12;
+        }
+        select.status-select[data-current="IN STAMPA"] {
+            border-color: #0078FF;
+            background: rgba(0, 120, 255, 0.12);
+            color: #0078FF;
+        }
+        select.status-select[data-current="IN LEGATORIA"] {
+            border-color: #9B59B6;
+            background: rgba(155, 89, 182, 0.12);
+            color: #9B59B6;
+        }
+        select.status-select[data-current="PRONTO"] {
+            border-color: #2ECC71;
+            background: rgba(46, 204, 113, 0.12);
+            color: #2ECC71;
+        }
+        .status-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-status-save {
+            background: #252830;
+            color: #EDEDED;
+            border: 1px solid var(--border);
+            padding: 5px 8px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+        .btn-status-save:hover {
+            background: #0078FF;
+            color: #fff;
+            border-color: #0078FF;
+        }
+        .status-feedback {
+            font-size: 0.75rem;
+            margin-top: 4px;
+            font-weight: 600;
+            min-height: 16px;
+        }
         .toast-msg {
             position: fixed;
             bottom: 24px;
@@ -185,12 +246,18 @@ DASHBOARD_HTML = """
                             <strong>{{ o.totale_file }} foto</strong>
                         </td>
                         <td>
-                            <select class="status-select" data-current="{{ o.stato }}" onchange="aggiornaStato(this, '{{ o.order_id }}')">
-                                <option value="IN ATTESA" {% if o.stato == 'IN ATTESA' %}selected{% endif %}>🟡 In Attesa</option>
-                                <option value="IN STAMPA" {% if o.stato == 'IN STAMPA' %}selected{% endif %}>🔵 In Stampa</option>
-                                <option value="IN LEGATORIA" {% if o.stato == 'IN LEGATORIA' %}selected{% endif %}>🟣 In Legatoria</option>
-                                <option value="PRONTO" {% if o.stato == 'PRONTO' %}selected{% endif %}>🟢 Pronto / Spedito</option>
-                            </select>
+                            <div class="status-wrapper">
+                                <select class="status-select" id="status-sel-{{ o.order_id }}" data-current="{{ o.stato }}" onchange="aggiornaStato(this, '{{ o.order_id }}')">
+                                    <option value="IN ATTESA" {% if o.stato == 'IN ATTESA' %}selected{% endif %}>🟡 In Attesa</option>
+                                    <option value="IN STAMPA" {% if o.stato == 'IN STAMPA' %}selected{% endif %}>🔵 In Stampa</option>
+                                    <option value="IN LEGATORIA" {% if o.stato == 'IN LEGATORIA' %}selected{% endif %}>🟣 In Legatoria</option>
+                                    <option value="PRONTO" {% if o.stato == 'PRONTO' %}selected{% endif %}>🟢 Pronto / Spedito</option>
+                                </select>
+                                <button type="button" class="btn-status-save" onclick="aggiornaStato(document.getElementById('status-sel-{{ o.order_id }}'), '{{ o.order_id }}')" title="Salva stato commessa">
+                                    💾 Salva
+                                </button>
+                            </div>
+                            <div id="feedback-{{ o.order_id }}" class="status-feedback" style="display:none;"></div>
                         </td>
                         <td>
                             <div class="btn-group">
@@ -235,9 +302,17 @@ DASHBOARD_HTML = """
         }
 
         async function aggiornaStato(selectElem, orderId) {
+            if (!selectElem) return;
             const vecchioStato = selectElem.getAttribute('data-current') || selectElem.value;
             const nuovoStato = selectElem.value;
+            const feedback = document.getElementById('feedback-' + orderId);
+            
             selectElem.style.opacity = '0.5';
+            if (feedback) {
+                feedback.style.display = 'block';
+                feedback.style.color = '#F39C12';
+                feedback.textContent = '⏳ Salvataggio...';
+            }
             resetReloadTimer();
 
             try {
@@ -250,27 +325,39 @@ DASHBOARD_HTML = """
                 selectElem.style.opacity = '1.0';
                 if(data && data.success) {
                     selectElem.setAttribute('data-current', nuovoStato);
-                    selectElem.style.borderColor = '#2ECC71';
-                    showToast(`✓ Stato aggiornato: ${nuovoStato}`);
-                    setTimeout(() => { selectElem.style.borderColor = ''; }, 2000);
+                    selectElem.value = nuovoStato;
+                    if (feedback) {
+                        feedback.style.color = '#2ECC71';
+                        feedback.textContent = '✓ Salvato: ' + nuovoStato;
+                        setTimeout(() => { if (feedback) feedback.style.display = 'none'; }, 2500);
+                    }
+                    showToast(`✓ Commessa ${orderId}: ${nuovoStato}`);
                 } else {
                     selectElem.value = vecchioStato;
+                    if (feedback) {
+                        feedback.style.color = '#E74C3C';
+                        feedback.textContent = '❌ Errore salvataggio';
+                    }
                     showToast('Errore durante il salvataggio!', true);
                 }
             } catch (err) {
                 console.error("Errore aggiornaStato:", err);
                 selectElem.style.opacity = '1.0';
                 selectElem.value = vecchioStato;
-                showToast('Errore di connessione!', true);
+                if (feedback) {
+                    feedback.style.color = '#E74C3C';
+                    feedback.textContent = '❌ Errore connessione';
+                }
+                showToast('Errore di connessione al server!', true);
             }
         }
 
         function eliminaOrdine(orderId) {
-            if (confirm('Sei sicuro di voler eliminare la commessa ' + orderId + '?\nQuesta operazione rimuoverà definitivamente anche le foto archiviate sul server.')) {
-                fetch('/api/orders/' + orderId, { method: 'DELETE' })
+            if (confirm('Sei sicuro di voler eliminare la commessa ' + orderId + '? Questa operazione rimuoverà definitivamente anche le foto archiviate.')) {
+                fetch('/api/orders/' + encodeURIComponent(orderId), { method: 'DELETE' })
                     .then(res => res.json())
                     .then(data => {
-                        if(data.success) {
+                        if(data && data.success) {
                             location.reload();
                         } else {
                             alert('Errore eliminazione commessa');
@@ -409,7 +496,11 @@ def admin_dashboard():
     """Dashboard visuale web per l'amico del laboratorio."""
     ordini = ServerStorage.get_tutti_ordini()
     port = app.config.get("SERVER_PORT", 5050)
-    return render_template_string(DASHBOARD_HTML, ordini=ordini, port=port)
+    resp = make_response(render_template_string(DASHBOARD_HTML, ordini=ordini, port=port))
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 
 @app.route("/admin/orders/<order_id>/scheda")
