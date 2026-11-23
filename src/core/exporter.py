@@ -9,7 +9,7 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 from PIL import Image
-from src.core.constants import ARCHIVIO_DIR, DEFAULT_DPI, DEFAULT_JPEG_QUALITY
+from src.core.constants import ARCHIVIO_DIR, DEFAULT_DPI, DEFAULT_JPEG_QUALITY, FORMATI
 
 
 class OrderExporter:
@@ -54,6 +54,36 @@ class OrderExporter:
                 # Ottieni l'immagine ritagliata alla risoluzione nativa
                 cropped_img = foto.get_cropped_image()
 
+                # Gestione Bordino Bianco professionale (pass-partout lab 3mm)
+                has_border = getattr(foto, "bordino_bianco", False) or bool(order_data.get("bordino_bianco", False))
+                if has_border:
+                    formato_str = foto.formato or order_data.get("formato", "")
+                    base_fmt = formato_str.split(" ")[0].lower() if formato_str else ""
+                    if base_fmt in FORMATI:
+                        w_cm, h_cm = FORMATI[base_fmt]
+                        tw = round((w_cm / 2.54) * dpi_val)
+                        th = round((h_cm / 2.54) * dpi_val)
+                        if (cropped_img.width > cropped_img.height) != (tw > th):
+                            tw, th = th, tw
+                        # 3 mm standard di laboratorio a 300 DPI
+                        b_px = max(18, round((3.0 / 25.4) * dpi_val))
+                        inner_w = max(10, tw - 2 * b_px)
+                        inner_h = max(10, th - 2 * b_px)
+                        resized_inner = cropped_img.resize((inner_w, inner_h), Image.Resampling.LANCZOS)
+                        white_canvas = Image.new("RGB", (tw, th), (255, 255, 255))
+                        white_canvas.paste(resized_inner, (b_px, b_px))
+                        cropped_img = white_canvas
+                    else:
+                        b_px = max(24, int(min(cropped_img.width, cropped_img.height) * 0.025))
+                        tw = cropped_img.width
+                        th = cropped_img.height
+                        inner_w = max(10, tw - 2 * b_px)
+                        inner_h = max(10, th - 2 * b_px)
+                        resized_inner = cropped_img.resize((inner_w, inner_h), Image.Resampling.LANCZOS)
+                        white_canvas = Image.new("RGB", (tw, th), (255, 255, 255))
+                        white_canvas.paste(resized_inner, (b_px, b_px))
+                        cropped_img = white_canvas
+
                 save_kwargs = {
                     "format": "JPEG",
                     "quality": quality_val,
@@ -73,6 +103,7 @@ class OrderExporter:
                     "quantita": foto.quantita,
                     "formato": foto.formato or order_data.get("formato", ""),
                     "materiale": foto.materiale or order_data.get("materiale", ""),
+                    "bordino_bianco": has_border,
                     "risoluzione_px": [cropped_img.width, cropped_img.height],
                     "dpi": dpi_val,
                     "crop_box": list(foto.crop_box),
@@ -95,6 +126,7 @@ class OrderExporter:
                 "formato_globale": order_data.get("formato", ""),
                 "materiale_globale": order_data.get("materiale", ""),
                 "correzione": order_data.get("correzione", False),
+                "bordino_bianco": any(f.get("bordino_bianco", False) for f in foto_json_list),
                 "stato": "SALVATO",
                 "totale_foto": len(foto_list),
                 "totale_stampe": sum(f.quantita for f in foto_list),

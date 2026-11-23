@@ -20,6 +20,7 @@ else:
     SERVER_DATA_DIR = Path(__file__).resolve().parent.parent.parent / "server_data"
 
 SERVER_ORDERS_DIR = SERVER_DATA_DIR / "orders"
+SERVER_CLIENTS_FILE = SERVER_DATA_DIR / "clients.json"
 
 
 class ServerStorage:
@@ -174,4 +175,102 @@ class ServerStorage:
                 print(f"Errore eliminazione ordine {order_id}: {e}")
                 return False
         return False
+
+    # =========================================================================
+    # Gestione Anagrafica Fotografi & PIN Sicuro
+    # =========================================================================
+    @classmethod
+    def get_tutti_clienti(cls) -> dict:
+        """Restituisce il dizionario di tutti i fotografi registrati."""
+        cls.init()
+        if SERVER_CLIENTS_FILE.exists():
+            try:
+                with open(SERVER_CLIENTS_FILE, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"Errore lettura clients.json: {e}")
+
+        # Account demo predefiniti per test immediato
+        default_clients = {
+            "101": {
+                "codice": "101",
+                "nome_studio": "Foto Studio Demo",
+                "pin": "1234",
+                "titolare": "Marco Rossi",
+                "telefono": "333 1234567",
+                "data_registrazione": "2026-11-23",
+                "attivo": True
+            }
+        }
+        try:
+            with open(SERVER_CLIENTS_FILE, "w", encoding="utf-8") as f:
+                json.dump(default_clients, f, indent=4, ensure_ascii=False)
+        except Exception:
+            pass
+        return default_clients
+
+    @classmethod
+    def salva_cliente(cls, codice: str, nome_studio: str, pin: str, titolare: str = "", telefono: str = "") -> bool:
+        """Aggiunge o aggiorna un fotografo partner con il suo codice e PIN univoco."""
+        clean_cod = str(codice).strip()
+        clean_pin = str(pin).strip()
+        clean_nome = str(nome_studio).strip()
+        if not clean_cod or not clean_pin or not clean_nome:
+            return False
+
+        clienti = cls.get_tutti_clienti()
+        clienti[clean_cod] = {
+            "codice": clean_cod,
+            "nome_studio": clean_nome,
+            "pin": clean_pin,
+            "titolare": titolare.strip(),
+            "telefono": telefono.strip(),
+            "data_registrazione": datetime.now().strftime("%Y-%m-%d"),
+            "attivo": True
+        }
+
+        try:
+            with open(SERVER_CLIENTS_FILE, "w", encoding="utf-8") as f:
+                json.dump(clienti, f, indent=4, ensure_ascii=False)
+            return True
+        except Exception as e:
+            print(f"Errore salvataggio clienti: {e}")
+            return False
+
+    @classmethod
+    def elimina_cliente(cls, codice: str) -> bool:
+        clienti = cls.get_tutti_clienti()
+        clean_cod = str(codice).strip()
+        if clean_cod in clienti:
+            del clienti[clean_cod]
+            try:
+                with open(SERVER_CLIENTS_FILE, "w", encoding="utf-8") as f:
+                    json.dump(clienti, f, indent=4, ensure_ascii=False)
+                return True
+            except Exception:
+                return False
+        return False
+
+    @classmethod
+    def verifica_cliente(cls, codice: str, pin: str) -> tuple[bool, dict | None]:
+        """Verifica se il codice fotografo e il PIN corrispondono a uno studio attivo."""
+        clienti = cls.get_tutti_clienti()
+        clean_cod = str(codice).strip()
+        clean_pin = str(pin).strip()
+
+        if clean_cod in clienti:
+            info = clienti[clean_cod]
+            if str(info.get("pin")).strip() == clean_pin and info.get("attivo", True):
+                return True, info
+        return False, None
+
+    @classmethod
+    def get_ordini_per_cliente(cls, codice: str) -> list:
+        """Restituisce tutti gli ordini appartenenti al fotografo specificato."""
+        tutti = cls.get_tutti_ordini()
+        clean_cod = str(codice).strip()
+        if not clean_cod:
+            return []
+        # Corrispondenza su codice_cliente (es. "101" o numerico)
+        return [o for o in tutti if str(o.get("codice_cliente", "")).strip() == clean_cod]
 

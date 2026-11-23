@@ -200,7 +200,10 @@ DASHBOARD_HTML = """
         <div class="card-table">
             <div class="table-header">
                 <h2>📥 Elenco Ordini di Produzione in Tempo Reale</h2>
-                <button class="btn-refresh" onclick="location.reload()">🔄 Aggiorna Lista</button>
+                <div style="display:flex; gap:8px;">
+                    <button class="btn-refresh" style="background:#0078FF; border-color:#0078FF; color:#fff;" onclick="mostraModalClienti()">👥 Anagrafica Fotografi & PIN</button>
+                    <button class="btn-refresh" onclick="location.reload()">🔄 Aggiorna Lista</button>
+                </div>
             </div>
             <table>
                 <thead>
@@ -237,6 +240,9 @@ DASHBOARD_HTML = """
                             {% else %}
                             <strong style="color: #66B2FF;">📖 {{ o.modello_nome or 'Stampa Album' }}</strong><br>
                             <small>{{ o.formato_globale }}</small>
+                            {% endif %}
+                            {% if o.bordino_bianco %}
+                            <br><span style="display:inline-block; margin-top:3px; background:rgba(255,255,255,0.12); border:1px solid #FFF; color:#FFF; padding:1px 6px; border-radius:4px; font-size:0.7rem; font-weight:bold;">⚪ Bordino 3mm</span>
                             {% endif %}
                         </td>
                         <td>
@@ -365,6 +371,117 @@ DASHBOARD_HTML = """
                     });
             }
         }
+
+        // --- Gestione Anagrafica Fotografi & PIN ---
+        function mostraModalClienti() {
+            document.getElementById('modal-clienti').style.display = 'flex';
+            caricaClienti();
+        }
+
+        function chiudiModalClienti() {
+            document.getElementById('modal-clienti').style.display = 'none';
+        }
+
+        async function caricaClienti() {
+            try {
+                const res = await fetch('/api/admin/clients');
+                const data = await res.json();
+                const tbody = document.getElementById('tbody-clienti');
+                tbody.innerHTML = '';
+                if(data && data.clienti) {
+                    data.clienti.forEach(c => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td style="padding:8px 12px; border-bottom:1px solid var(--border); font-weight:bold; color:#0078FF;">#${c.codice}</td>
+                            <td style="padding:8px 12px; border-bottom:1px solid var(--border); font-weight:600;">${c.nome_studio}</td>
+                            <td style="padding:8px 12px; border-bottom:1px solid var(--border); font-family:monospace; color:#2ECC71; font-weight:bold;">${c.pin}</td>
+                            <td style="padding:8px 12px; border-bottom:1px solid var(--border); text-align:right;">
+                                <button onclick="eliminaFotografo('${c.codice}')" style="background:rgba(231,76,60,0.2); color:#E74C3C; border:1px solid rgba(231,76,60,0.4); padding:3px 8px; border-radius:4px; cursor:pointer;">🗑️</button>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+            } catch(e) {
+                console.error("Errore caricamento clienti:", e);
+            }
+        }
+
+        async function aggiungiFotografo() {
+            const cod = document.getElementById('new-cod').value.trim();
+            const nome = document.getElementById('new-nome').value.trim();
+            const pin = document.getElementById('new-pin').value.trim();
+
+            if(!cod || !nome || !pin) {
+                alert('Inserisci Codice (3 o 4 cifre), Nome Studio e PIN (4 cifre).');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/admin/clients', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ codice: cod, nome_studio: nome, pin: pin })
+                });
+                const data = await res.json();
+                if(data && data.success) {
+                    document.getElementById('new-cod').value = '';
+                    document.getElementById('new-nome').value = '';
+                    document.getElementById('new-pin').value = '';
+                    caricaClienti();
+                    showToast('✓ Fotografo ' + nome + ' registrato!');
+                } else {
+                    alert(data.error || 'Errore salvataggio fotografo');
+                }
+            } catch(e) {
+                alert('Errore di connessione');
+            }
+        }
+
+        async function eliminaFotografo(cod) {
+            if(confirm('Rimuovere il fotografo con codice #' + cod + '? Non potrà più visualizzare i suoi ordini.')) {
+                await fetch('/api/admin/clients/' + encodeURIComponent(cod), { method: 'DELETE' });
+                caricaClienti();
+            }
+        }
+    </script>
+
+    <!-- Modal Anagrafica Fotografi & PIN -->
+    <div id="modal-clienti" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center;">
+        <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:10px; width:680px; max-width:90%; padding:24px; box-shadow:0 10px 40px rgba(0,0,0,0.6);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                <h3 style="margin:0; font-size:1.15rem;">👥 Anagrafica Fotografi & PIN Sicuro</h3>
+                <button onclick="chiudiModalClienti()" style="background:none; border:none; color:var(--text-muted); font-size:1.4rem; cursor:pointer;">&times;</button>
+            </div>
+            <p style="color:var(--text-muted); font-size:0.85rem; margin-top:0;">Ogni fotografo partner ha un Codice Studio (3 o 4 cifre) e un PIN segreto per accedere ai propri ordini ed evitare scambi di commesse tra colleghi.</p>
+            
+            <div style="background:#18191C; border:1px solid var(--border); border-radius:6px; padding:12px; margin-bottom:16px; display:flex; gap:8px; flex-wrap:wrap;">
+                <input id="new-cod" placeholder="Codice (es. 102)" style="flex:1; min-width:100px; background:#22242A; border:1px solid var(--border); color:#fff; padding:6px 10px; border-radius:5px; font-weight:bold;">
+                <input id="new-nome" placeholder="Nome Studio / Fotografo" style="flex:2; min-width:160px; background:#22242A; border:1px solid var(--border); color:#fff; padding:6px 10px; border-radius:5px;">
+                <input id="new-pin" placeholder="PIN (4 cifre)" style="width:100px; background:#22242A; border:1px solid var(--border); color:#fff; padding:6px 10px; border-radius:5px; font-weight:bold;">
+                <button onclick="aggiungiFotografo()" class="btn-action btn-download" style="padding:6px 14px;">+ Registra</button>
+            </div>
+
+            <div style="max-height:260px; overflow-y:auto; border:1px solid var(--border); border-radius:6px;">
+                <table style="width:100%; border-collapse:collapse; font-size:0.85rem;" id="table-clienti">
+                    <thead>
+                        <tr>
+                            <th style="padding:8px 12px; background:#18191C; border-bottom:1px solid var(--border);">Codice</th>
+                            <th style="padding:8px 12px; background:#18191C; border-bottom:1px solid var(--border);">Nome Studio</th>
+                            <th style="padding:8px 12px; background:#18191C; border-bottom:1px solid var(--border);">PIN Segreto</th>
+                            <th style="padding:8px 12px; background:#18191C; border-bottom:1px solid var(--border); text-align:right;">Azione</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-clienti">
+                    </tbody>
+                </table>
+            </div>
+            
+            <div style="text-align:right; margin-top:16px;">
+                <button onclick="chiudiModalClienti()" class="btn-action btn-scheda">Chiudi</button>
+            </div>
+        </div>
+    </div>
     </script>
 </body>
 </html>
@@ -461,7 +578,7 @@ SCHEDA_COMMESSA_HTML = """
     <div class="box" style="margin-bottom: 20px;">
         <h3>Dettagli di Stampa & Risoluzione</h3>
         <p>Totale File Fotografici: <strong>{{ ordine.totale_file }} scatti</strong> (Qualità 300 DPI con profilo colore ICC)</p>
-        <p style="font-size: 12px; font-weight: normal; margin-top: 4px;">Correzione Minilab: <strong>{{ 'ATTIVA' if ordine.correzione else 'DISATTIVA' }}</strong></p>
+        <p style="font-size: 12px; font-weight: normal; margin-top: 4px;">Correzione Minilab: <strong>{{ 'ATTIVA' if ordine.correzione else 'DISATTIVA' }}</strong> | Bordino Bianco: <strong>{{ 'PRESENTE (3 mm)' if ordine.bordino_bianco else 'NO' }}</strong></p>
     </div>
 
     <div class="notes">
@@ -522,6 +639,80 @@ def api_catalog():
     })
 
 
+@app.route("/api/auth/verify", methods=["POST"])
+def api_auth_verify():
+    """Verifica il codice cliente (3/4 cifre) e il PIN segreto del fotografo."""
+    data = {}
+    if request.is_json:
+        data = request.get_json(silent=True) or {}
+    if not data:
+        data = request.form or {}
+
+    codice = str(data.get("codice", "")).strip()
+    pin = str(data.get("pin", "")).strip()
+
+    if not codice or not pin:
+        return jsonify({"success": False, "error": "Codice Studio e PIN sono obbligatori."}), 400
+
+    valido, info = ServerStorage.verifica_cliente(codice, pin)
+    if valido and info:
+        return jsonify({
+            "success": True,
+            "codice": codice,
+            "nome_studio": info.get("nome_studio", ""),
+            "titolare": info.get("titolare", "")
+        })
+    return jsonify({"success": False, "error": "Codice fotografo o PIN non validi."}), 401
+
+
+@app.route("/api/orders/history", methods=["GET"])
+def api_orders_history():
+    """Restituisce lo storico ordini per un fotografo specifico protetto dal suo PIN."""
+    codice = str(request.args.get("codice", "")).strip()
+    pin = str(request.args.get("pin", "")).strip()
+
+    if not codice:
+        return jsonify({"success": False, "error": "Parametro 'codice' mancante."}), 400
+
+    valido, info = ServerStorage.verifica_cliente(codice, pin)
+    if not valido:
+        return jsonify({"success": False, "error": "Accesso negato: PIN fotografo errato o non autorizzato."}), 401
+
+    ordini = ServerStorage.get_ordini_per_cliente(codice)
+    return jsonify({
+        "success": True,
+        "studio": info.get("nome_studio", f"Studio {codice}"),
+        "ordini": ordini
+    })
+
+
+@app.route("/api/admin/clients", methods=["GET", "POST"])
+def api_admin_clients():
+    """API gestione anagrafica fotografi partner del laboratorio."""
+    if request.method == "POST":
+        data = request.get_json(silent=True) or request.form or {}
+        codice = str(data.get("codice", "")).strip()
+        nome = str(data.get("nome_studio", "")).strip()
+        pin = str(data.get("pin", "")).strip()
+        titolare = str(data.get("titolare", "")).strip()
+        telefono = str(data.get("telefono", "")).strip()
+
+        if not codice or not nome or not pin:
+            return jsonify({"success": False, "error": "Codice (3/4 cifre), Nome Studio e PIN sono obbligatori."}), 400
+
+        ok = ServerStorage.salva_cliente(codice, nome, pin, titolare, telefono)
+        return jsonify({"success": ok})
+
+    clienti = ServerStorage.get_tutti_clienti()
+    return jsonify({"success": True, "clienti": list(clienti.values())})
+
+
+@app.route("/api/admin/clients/<codice>", methods=["DELETE"])
+def api_admin_delete_client(codice):
+    ok = ServerStorage.elimina_cliente(codice)
+    return jsonify({"success": ok})
+
+
 @app.route("/api/orders", methods=["GET"])
 def api_get_orders():
     """Elenco di tutti gli ordini ricevuti."""
@@ -550,6 +741,15 @@ def api_post_order():
 
         # Genera un ID commessa univoco
         order_id = ServerStorage.genera_order_id()
+
+        # Verifica studio fotografo se fornito codice e pin
+        cod = str(metadata.get("codice_cliente", "")).strip()
+        pin = str(metadata.get("pin_cliente", "")).strip()
+        if cod and pin:
+            valido, info = ServerStorage.verifica_cliente(cod, pin)
+            if valido and info:
+                metadata["studio_verificato"] = True
+                metadata["nome_studio"] = info.get("nome_studio", metadata.get("nome_cliente", ""))
 
         # Salva ordine e foto
         folder = ServerStorage.salva_ordine(order_id, metadata, uploaded_files)

@@ -253,11 +253,30 @@ class EditorPanel(tk.Frame):
         # Bordo ritaglio nitido con contorno blu
         self.canvas.create_rectangle(x1, y1, x2, y2, outline="#0078FF", width=2, tags="overlay")
 
-        # Regola dei Terzi (linee tratteggiate bianche sottili)
         cw = abs(x2 - x1)
         ch = abs(y2 - y1)
         min_x = min(x1, x2)
         min_y = min(y1, y2)
+
+        # Se bordino bianco attivo sulla foto, disegna la cornice guida visiva del pass-partout
+        if self.current_foto and getattr(self.current_foto, "bordino_bianco", False):
+            inset = max(6, int(min(cw, ch) * 0.035))
+            if cw > inset * 2 and ch > inset * 2:
+                self.canvas.create_rectangle(
+                    min_x + inset, min_y + inset,
+                    min_x + cw - inset, min_y + ch - inset,
+                    outline="#FFFFFF", width=2, tags="overlay"
+                )
+                self.canvas.create_text(
+                    min_x + inset + 6, min_y + inset + 6,
+                    text="⚪ Bordino 3mm",
+                    anchor="nw",
+                    fill="#FFFFFF",
+                    font=("Helvetica", 9, "bold"),
+                    tags="overlay"
+                )
+
+        # Regola dei Terzi (linee tratteggiate bianche sottili)
         if cw > 40 and ch > 40:
             grid_color = "#FFFFFF"
             self.canvas.create_line(min_x + cw / 3, min_y, min_x + cw / 3, min_y + ch, fill=grid_color, dash=(2, 4), tags="overlay")

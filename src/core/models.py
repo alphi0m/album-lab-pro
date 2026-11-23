@@ -28,6 +28,7 @@ class FotoItem:
         # Specifiche opzionali della foto (possono ereditare da quelle globali dell'ordine)
         self.formato = ""
         self.materiale = ""
+        self.bordino_bianco = False
 
         # Coordinate del crop nell'immagine originale: (x1, y1, x2, y2) in pixel
         w, h = self.image_orig.size
@@ -85,7 +86,7 @@ class FotoItem:
 
     def get_thumbnail(self, size: int = 110) -> ImageTk.PhotoImage:
         """Genera una miniatura quadrata scura con pillole moderne di quantità e stato crop."""
-        cache_key = (size, self.quantita, self.has_custom_crop)
+        cache_key = (size, self.quantita, self.has_custom_crop, self.bordino_bianco)
         if cache_key in self._thumb_cache:
             return self._thumb_cache[cache_key]
 
@@ -104,6 +105,14 @@ class FotoItem:
         thumb.paste(resized, (x_offset, y_offset))
 
         draw = ImageDraw.Draw(thumb)
+
+        # Se bordino bianco attivo, disegna una sottile cornice bianca elegante attorno alla foto
+        if self.bordino_bianco:
+            draw.rectangle(
+                [x_offset, y_offset, x_offset + nw - 1, y_offset + nh - 1],
+                outline=(255, 255, 255),
+                width=2
+            )
 
         # ---------------- 1. Badge Quantità a Pillola (in alto a destra) ----------------
         badge_text = f"x{self.quantita}"
@@ -125,12 +134,17 @@ class FotoItem:
         draw.rounded_rectangle([bx1, by1, bx2, by2], radius=7, fill=pill_bg, outline=pill_border, width=1)
         draw.text((bx1 + 5, by1 + 2), badge_text, fill=(255, 255, 255))
 
-        # ---------------- 2. Badge Stato Crop Personalizzato (in basso a sinistra) ----------------
+        # ---------------- 2. Badge Stato Crop Personalizzato o Bordino (in basso a sinistra) ----------------
         if self.has_custom_crop:
             cx1, cy1 = 5, size - 22
             cx2, cy2 = cx1 + 34, cy1 + 16
             draw.rounded_rectangle([cx1, cy1, cx2, cy2], radius=6, fill=(39, 174, 96), outline=(46, 204, 113), width=1)
             draw.text((cx1 + 4, cy1 + 2), "CROP", fill=(255, 255, 255))
+        elif self.bordino_bianco:
+            cx1, cy1 = 5, size - 22
+            cx2, cy2 = cx1 + 38, cy1 + 16
+            draw.rounded_rectangle([cx1, cy1, cx2, cy2], radius=6, fill=(50, 54, 65), outline=(200, 200, 200), width=1)
+            draw.text((cx1 + 4, cy1 + 2), "BORDO", fill=(255, 255, 255))
 
         tk_img = ImageTk.PhotoImage(thumb)
         self._thumb_cache[cache_key] = tk_img
@@ -142,6 +156,7 @@ class FotoItem:
             "quantita": self.quantita,
             "formato": self.formato,
             "materiale": self.materiale,
+            "bordino_bianco": self.bordino_bianco,
             "crop_box": list(self.crop_box),
             "has_custom_crop": self.has_custom_crop,
         }
@@ -152,6 +167,7 @@ class FotoItem:
         obj.quantita = data.get("quantita", 1)
         obj.formato = data.get("formato", "")
         obj.materiale = data.get("materiale", "")
+        obj.bordino_bianco = data.get("bordino_bianco", False)
         if "crop_box" in data and len(data["crop_box"]) == 4:
             obj.crop_box = tuple(data["crop_box"])
             obj.has_custom_crop = data.get("has_custom_crop", False)

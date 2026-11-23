@@ -181,6 +181,28 @@ class FormatiPanel(ttk.LabelFrame):
         )
         self.btn_applica_tutte.pack(side="right", fill="x", expand=True, padx=(3, 0))
 
+        # Opzione Bordino Bianco (Pass-partout lab 3mm)
+        row_bordino = ttk.Frame(self, style="Card.TFrame")
+        row_bordino.pack(fill="x", pady=(6, 0))
+
+        self.bordino_var = tk.BooleanVar(value=False)
+        self.chk_bordino = ttk.Checkbutton(
+            row_bordino,
+            text="Bordino Bianco (3 mm)",
+            variable=self.bordino_var,
+            command=self._on_bordino_toggled
+        )
+        self.chk_bordino.pack(side="left")
+
+        self.btn_applica_bordino = ttk.Button(
+            row_bordino,
+            text="⚡ Bordo a Tutte",
+            style="TButton",
+            width=13,
+            command=self.applica_bordino_a_tutte
+        )
+        self.btn_applica_bordino.pack(side="right")
+
         self.ricostruisci_pillole(self.DEFAULT_FORMATS_ALBUM)
 
     def set_modalita(self, modalita: str):
@@ -287,6 +309,35 @@ class FormatiPanel(ttk.LabelFrame):
 
     def get_formato(self) -> str:
         return self.formato_var.get()
+
+    def _on_bordino_toggled(self):
+        val = self.bordino_var.get()
+        idx = getattr(self.main_app, "foto_corrente_index", None)
+        if idx is not None and 0 <= idx < len(self.main_app.foto_list):
+            foto = self.main_app.foto_list[idx]
+            foto.bordino_bianco = val
+            if hasattr(self.main_app, "editor_panel"):
+                self.main_app.editor_panel._aggiorna_render()
+            if hasattr(self.main_app, "miniature_panel"):
+                self.main_app.miniature_panel.aggiorna_vista()
+
+    def applica_bordino_a_tutte(self):
+        if not self.main_app.foto_list:
+            messagebox.showinfo("Nessuna Foto", "Nessuna foto presente nell'ordine.")
+            return
+        val = self.bordino_var.get()
+        for f in self.main_app.foto_list:
+            f.bordino_bianco = val
+        if hasattr(self.main_app, "editor_panel"):
+            self.main_app.editor_panel._aggiorna_render()
+        if hasattr(self.main_app, "miniature_panel"):
+            self.main_app.miniature_panel.aggiorna_vista()
+        stato = "attivato" if val else "disattivato"
+        messagebox.showinfo("Bordino Bianco", f"Bordino bianco 3mm {stato} per tutte le {len(self.main_app.foto_list)} foto.")
+
+    def aggiorna_da_foto(self, foto):
+        if foto:
+            self.bordino_var.set(getattr(foto, "bordino_bianco", False))
 
 
 # =============================================================================

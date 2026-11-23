@@ -199,6 +199,147 @@ class TestDomainEvolution(unittest.TestCase):
         self.assertIn("Supporto Carta Minilab", html_scheda)
         self.assertIn("Controllo Taglio & Confezionamento Busta", html_scheda)
 
+    def test_bordino_bianco_e_rendering(self):
+        """Verifica la persistenza e l'esportazione con bordino bianco 3mm su canvas 300 DPI."""
+        foto_path = self.temp_dir / "bordino_test.jpg"
+        img = Image.new("RGB", (1200, 800), (255, 0, 0)) # Immagine rossa pura
+        img.save(str(foto_path), "JPEG", quality=95)
+
+        item = FotoItem(str(foto_path))
+        item.bordino_bianco = True
+        item.formato = "10x15"
+
+        # Verifica to_dict e from_dict
+        d = item.to_dict()
+        self.assertTrue(d.get("bordino_bianco"))
+        item_restored = FotoItem.from_dict(d)
+        self.assertTrue(item_restored.bordino_bianco)
+
+        # Esportazione
+        order_data = {
+            "num_busta": "777",
+            "codice_cliente": "CLI01",
+            "nome_cliente": "Studio Bordino",
+            "tipo_servizio": "STAMPE_FOTO",
+            "modello_id": "stampe_singole",
+            "modello_nome": "Stampe con Bordino",
+            "modello_cofanetto": "Nessuno",
+            "formato": "10x15",
+            "materiale": "Carta Lucida",
+            "note": "Test bordo",
+            "bordino_bianco": True,
+            "correzione": False,
+        }
+
+        from src.core import exporter
+        old_dir = exporter.ARCHIVIO_DIR
+        exporter.ARCHIVIO_DIR = self.archivio_dir
+        try:
+            ok, res_path = OrderExporter.salva_ordine(order_data, [item], {"dpi_stampa": 300, "qualita_jpeg": 95})
+            self.assertTrue(ok)
+            json_file = Path(res_path) / "ordine.json"
+            with open(json_file, "r", encoding="utf-8") as f:
+                saved = json.load(f)
+
+            self.assertTrue(saved.get("bordino_bianco"))
+            self.assertTrue(saved["foto"][0]["bordino_bianco"])
+
+            # Controlla l'immagine salvata: gli angoli/bordi esterni devono essere bianchi (255, 255, 255)
+            # e l'area interna deve avere il colore originale (rosso 255, 0, 0)
+            file_stampa = Path(res_path) / saved["foto"][0]["file_stampa"]
+            with Image.open(file_stampa) as out_img:
+                w, h = out_img.size
+                # Bordo (pixel 5, 5) deve essere bianco (o quasi bianco per quantizzazione JPEG)
+                bp = out_img.getpixel((5, 5))
+                self.assertGreater(bp[0], 250)
+                self.assertGreater(bp[1], 250)
+                self.assertGreater(bp[2], 250)
+                # Centro deve essere rosso
+                cp = out_img.getpixel((w // 2, h // 2))
+                self.assertGreater(cp[0], 250)
+                self.assertLess(cp[1], 10)
+                self.assertLess(cp[2], 10)
+        finally:
+            exporter.ARCHIVIO_DIR = old_dir
+
+    def test_autenticazione_studio_e_storico_ordini(self):
+        """Verifica l'autenticazione fotografo con PIN e l'endpoint di storico ordini protetto."""
+        from src.server import storage
+
+        # Configura cartella temporanea per i clienti e gli ordini del server
+        old_clients_file = storage.SERVER_CLIENTS_FILE
+        old_orders_dir = storage.SERVER_ORDERS_DIR
+        storage.SERVER_CLIENTS_FILE = self.temp_dir / "clients.json"
+        storage.SERVER_ORDERS_DIR = self.temp_dir / "orders"
+        try:
+            # Registra un fotografo di test
+            ServerStorage.salva_cliente("201", "Studio Fantasia", "9876", "info@fantasia.it")
+
+            # Verifica corretta
+            ok, info = ServerStorage.verifica_cliente("201", "9876")
+            self.assertTrue(ok)
+            self.assertEqual(info["nome_studio"], "Studio Fantasia")
+
+            # Verifica errata (PIN errato)
+            ok_err, info_err = ServerStorage.verifica_cliente("201", "0000")
+            self.assertFalse(ok_err)
+            self.assertIsNone(info_err)
+
+            # Test API Flask
+            app.config["TESTING"] = True
+            client = app.test_client()
+
+            # POST /api/auth/verify OK
+            res_auth = client.post("/api/auth/verify", json={"codice": "201", "pin": "9876"})
+            self.assertEqual(res_auth.status_code, 200)
+            data_auth = res_auth.get_json()
+            self.assertTrue(data_auth["success"])
+            self.assertEqual(data_auth["nome_studio"], "Studio Fantasia")
+
+            # POST /api/auth/verify KO
+            res_auth_ko = client.post("/api/auth/verify", json={"codice": "201", "pin": "wrong"})
+            self.assertEqual(res_auth_ko.status_code, 401)
+            self.assertFalse(res_auth_ko.get_json()["success"])
+
+            # Aggiungiamo ordini appartenenti a 201 e a un altro cliente
+            order_id_1 = ServerStorage.genera_order_id()
+            ServerStorage.salva_ordine(order_id_1, {
+                "order_id": order_id_1,
+                "codice_cliente": "201",
+                "nome_cliente": "Studio Fantasia",
+                "num_busta": "1001",
+                "tipo_servizio": "STAMPE_FOTO",
+                "totale_foto": 10,
+                "bordino_bianco": True,
+            }, [])
+
+            order_id_2 = ServerStorage.genera_order_id()
+            ServerStorage.salva_ordine(order_id_2, {
+                "order_id": order_id_2,
+                "codice_cliente": "999", # Altro cliente
+                "nome_cliente": "Altro Studio",
+                "num_busta": "1002",
+                "tipo_servizio": "ALBUM",
+                "totale_foto": 50,
+                "bordino_bianco": False,
+            }, [])
+
+            # GET /api/orders/history protetto
+            res_hist = client.get("/api/orders/history?codice=201&pin=9876")
+            self.assertEqual(res_hist.status_code, 200)
+            hist_data = res_hist.get_json()
+            self.assertTrue(hist_data["success"])
+            self.assertEqual(len(hist_data["ordini"]), 1)
+            self.assertEqual(hist_data["ordini"][0]["num_busta"], "1001")
+            self.assertTrue(hist_data["ordini"][0]["bordino_bianco"])
+
+            # Accesso con PIN errato a /api/orders/history deve fallire
+            res_hist_ko = client.get("/api/orders/history?codice=201&pin=0000")
+            self.assertEqual(res_hist_ko.status_code, 401)
+        finally:
+            storage.SERVER_CLIENTS_FILE = old_clients_file
+            storage.SERVER_ORDERS_DIR = old_orders_dir
+
 
 if __name__ == "__main__":
     unittest.main()

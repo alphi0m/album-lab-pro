@@ -18,6 +18,7 @@ from src.ui.thumbnails import MiniaturePanel
 from src.ui.panels import ModelloPanel, FormatiPanel, MaterialiPanel, InfoOrdinePanel
 from src.ui.catalog_dialog import CatalogGalleryWindow
 from src.ui.upload_dialog import UploadDialog
+from src.ui.history_window import StoricoOrdiniWindow
 
 
 class MainApp:
@@ -158,6 +159,9 @@ class MainApp:
 
         ttk.Button(toolbar, text="💾 Salva Locale (Ctrl+S)", style="Success.TButton",
                    command=self.salva_ordine).pack(side="right", padx=4, pady=6)
+
+        ttk.Button(toolbar, text="📦 I Miei Ordini", style="TButton",
+                   command=self.apri_storico_ordini).pack(side="right", padx=4, pady=6)
 
     def imposta_modalita(self, modalita: str):
         """Commuta la modalità di lavoro tra 'Stampa Album' e 'Stampe Singole'."""
@@ -463,6 +467,8 @@ class MainApp:
         self.miniature_panel.active_index = index
         foto = self.foto_list[index]
         self.editor_panel.mostra_foto(foto)
+        if hasattr(self, "formati_panel"):
+            self.formati_panel.aggiorna_da_foto(foto)
         self.miniature_panel.aggiorna_evidenza()
         self._aggiorna_stats()
 
@@ -552,6 +558,8 @@ class MainApp:
 
         dati_commessa["formato"] = self.formati_panel.get_formato()
         dati_commessa["materiale"] = self.materiali_panel.get_materiale()
+        dati_commessa["bordino_bianco"] = self.formati_panel.bordino_var.get()
+        dati_commessa["pin_cliente"] = self.config_mgr.get("pin_cliente", "")
 
         if self.modalita == MODO_STAMPE:
             dati_commessa["tipo_servizio"] = "STAMPE_FOTO"
@@ -587,6 +595,10 @@ class MainApp:
                 open_folder(res_path)
 
             self.info_panel.reset_for_new_order()
+
+    def apri_storico_ordini(self):
+        """Apre la finestra di consultazione dello storico commesse con stato in tempo reale dal laboratorio."""
+        StoricoOrdiniWindow(self.root, self)
         else:
             messagebox.showerror("Errore Salvataggio", f"Si è verificato un errore:\n{res_path}")
 
@@ -652,6 +664,8 @@ class MainApp:
 
         dati_commessa["formato"] = self.formati_panel.get_formato()
         dati_commessa["materiale"] = self.materiali_panel.get_materiale()
+        dati_commessa["bordino_bianco"] = self.formati_panel.bordino_var.get()
+        dati_commessa["pin_cliente"] = self.config_mgr.get("pin_cliente", "")
 
         self.config_mgr.set("codice_cliente", dati_commessa["codice_cliente"])
 
@@ -672,6 +686,10 @@ class MainApp:
             pass
         self.info_panel.reset_for_new_order()
 
+    def apri_storico_ordini(self):
+        """Apre la finestra di consultazione dello storico commesse con stato in tempo reale dal laboratorio."""
+        StoricoOrdiniWindow(self.root, self)
+
     def nuovo_ordine(self):
         if self.foto_list or self.modello_selezionato:
             conferma = messagebox.askyesno(
@@ -689,6 +707,10 @@ class MainApp:
         self.miniature_panel.set_foto_items([])
         self.imposta_modalita(self.modalita)
         self.info_panel.reset_for_new_order()
+
+    def apri_storico_ordini(self):
+        """Apre la finestra di consultazione dello storico commesse con stato in tempo reale dal laboratorio."""
+        StoricoOrdiniWindow(self.root, self)
         self._aggiorna_stats()
 
     def _mostra_info(self):
