@@ -595,12 +595,12 @@ class MainApp:
                 open_folder(res_path)
 
             self.info_panel.reset_for_new_order()
+        else:
+            messagebox.showerror("Errore Salvataggio", f"Si è verificato un errore:\n{res_path}")
 
     def apri_storico_ordini(self):
         """Apre la finestra di consultazione dello storico commesse con stato in tempo reale dal laboratorio."""
         StoricoOrdiniWindow(self.root, self)
-        else:
-            messagebox.showerror("Errore Salvataggio", f"Si è verificato un errore:\n{res_path}")
 
     def invia_al_laboratorio(self):
         """Apre la finestra di trasmissione remota al laboratorio fotografico."""

@@ -199,6 +199,17 @@ class TestDomainEvolution(unittest.TestCase):
         self.assertIn("Supporto Carta Minilab", html_scheda)
         self.assertIn("Controllo Taglio & Confezionamento Busta", html_scheda)
 
+    def test_ui_modules_importability(self):
+        """Verifica che tutti i moduli grafici (UI) siano privi di errori di sintassi o import errati."""
+        import src.ui.main_window
+        import src.ui.history_window
+        import src.ui.editor
+        import src.ui.panels
+        import src.ui.thumbnails
+        import src.ui.theme
+        self.assertTrue(hasattr(src.ui.main_window, "run_app"))
+        self.assertTrue(hasattr(src.ui.history_window, "StoricoOrdiniWindow"))
+
     def test_bordino_bianco_e_rendering(self):
         """Verifica la persistenza e l'esportazione con bordino bianco 3mm su canvas 300 DPI."""
         foto_path = self.temp_dir / "bordino_test.jpg"

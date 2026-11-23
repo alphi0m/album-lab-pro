@@ -12,7 +12,7 @@ import urllib.parse
 from datetime import datetime
 from pathlib import Path
 
-from src.core.constants import BG_APP, BG_CARD, PRIMARY, SUCCESS, ACCENT_AMBER, TEXT_PRIMARY, TEXT_MUTED, BORDER_COLOR
+from src.ui.theme import BG_APP, BG_CARD, PRIMARY, SUCCESS, ACCENT_AMBER, TEXT_PRIMARY, TEXT_MUTED, BORDER_COLOR
 from src.core.config import open_folder, ARCHIVIO_DIR
 
 
