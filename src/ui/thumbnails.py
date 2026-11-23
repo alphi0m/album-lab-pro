@@ -152,32 +152,40 @@ class MiniaturePanel(tk.Frame):
         )
         lbl_name.pack(pady=(0, 2))
 
-        # Controllo rapido copie direttamente sulla miniatura
+        # Controllo rapido copie direttamente sulla miniatura (cross-platform dark)
         bar_qty = tk.Frame(card, bg=BG_CARD)
         bar_qty.pack(fill="x", padx=4, pady=(0, 4))
 
-        btn_q_min = tk.Button(
-            bar_qty, text="−", width=2, bg="#262830", fg="#FFF",
-            bd=0, activebackground=PRIMARY, activeforeground="#FFF",
-            cursor="hand2", font=("Helvetica", 8, "bold"),
-            command=lambda i=idx: self._modifica_quantita_singola(i, -1)
-        )
-        btn_q_min.pack(side="left")
+        def _make_qty_btn(text, delta):
+            btn = tk.Label(
+                bar_qty,
+                text=text,
+                bg="#262930",
+                fg="#FFFFFF",
+                font=("Helvetica", 10, "bold"),
+                width=3,
+                relief="flat",
+                highlightbackground="#3E424D",
+                highlightthickness=1,
+                cursor="hand2"
+            )
+            btn.bind("<Button-1>", lambda e, d=delta: self._modifica_quantita_singola(idx, d))
+            btn.bind("<Enter>", lambda e, b=btn: b.config(bg=PRIMARY, fg="#FFFFFF"))
+            btn.bind("<Leave>", lambda e, b=btn: b.config(bg="#262930", fg="#FFFFFF"))
+            return btn
+
+        btn_q_min = _make_qty_btn("−", -1)
+        btn_q_min.pack(side="left", padx=(2, 0))
 
         lbl_qty = tk.Label(
             bar_qty, text=f"{foto.quantita} cp", bg=BG_CARD,
-            fg=PRIMARY if foto.quantita > 1 else TEXT_MUTED,
+            fg="#52A1FF" if foto.quantita > 1 else TEXT_MUTED,
             font=("Helvetica", 9, "bold")
         )
         lbl_qty.pack(side="left", fill="x", expand=True)
 
-        btn_q_plus = tk.Button(
-            bar_qty, text="+", width=2, bg="#262830", fg="#FFF",
-            bd=0, activebackground=PRIMARY, activeforeground="#FFF",
-            cursor="hand2", font=("Helvetica", 8, "bold"),
-            command=lambda i=idx: self._modifica_quantita_singola(i, 1)
-        )
-        btn_q_plus.pack(side="right")
+        btn_q_plus = _make_qty_btn("+", 1)
+        btn_q_plus.pack(side="right", padx=(0, 2))
 
         card.lbl_name = lbl_name
         card.lbl_img = lbl_img

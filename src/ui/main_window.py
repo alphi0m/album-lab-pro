@@ -271,29 +271,48 @@ class MainApp:
     # -------------------------------------------------------------------------
     # Scorciatoie da Banco
     # -------------------------------------------------------------------------
+    def _is_text_focused(self) -> bool:
+        """Verifica se l'utente sta scrivendo in un campo testo (note, nome, busta, ecc.)."""
+        try:
+            w = self.root.focus_get()
+            if w is None:
+                return False
+            if isinstance(w, (tk.Text, tk.Entry, ttk.Entry)):
+                return True
+            cls_name = w.winfo_class().lower()
+            return "text" in cls_name or "entry" in cls_name
+        except Exception:
+            return False
+
+    def _safe_action(self, fn):
+        """Esegue l'azione solo se il focus non è attualmente in un widget di testo."""
+        if self._is_text_focused():
+            return
+        fn()
+
     def _registra_scorciatoie(self):
-        self.root.bind("<Left>", lambda e: self.prev_foto())
-        self.root.bind("<Right>", lambda e: self.next_foto())
+        self.root.bind("<Left>", lambda e: self._safe_action(self.prev_foto))
+        self.root.bind("<Right>", lambda e: self._safe_action(self.next_foto))
 
-        self.root.bind("<space>", lambda e: self.flip_crop())
-        self.root.bind("<r>", lambda e: self.flip_crop())
-        self.root.bind("<R>", lambda e: self.flip_crop())
+        self.root.bind("<space>", lambda e: self._safe_action(self.flip_crop))
+        self.root.bind("<r>", lambda e: self._safe_action(self.flip_crop))
+        self.root.bind("<R>", lambda e: self._safe_action(self.flip_crop))
 
-        self.root.bind("+", lambda e: self.modifica_quantita(1))
-        self.root.bind("-", lambda e: self.modifica_quantita(-1))
-        self.root.bind("<KP_Add>", lambda e: self.modifica_quantita(1))
-        self.root.bind("<KP_Subtract>", lambda e: self.modifica_quantita(-1))
+        self.root.bind("+", lambda e: self._safe_action(lambda: self.modifica_quantita(1)))
+        self.root.bind("-", lambda e: self._safe_action(lambda: self.modifica_quantita(-1)))
+        self.root.bind("<KP_Add>", lambda e: self._safe_action(lambda: self.modifica_quantita(1)))
+        self.root.bind("<KP_Subtract>", lambda e: self._safe_action(lambda: self.modifica_quantita(-1)))
 
-        self.root.bind("<Delete>", lambda e: self.cancella_foto_selezionate())
-        self.root.bind("<BackSpace>", lambda e: self.cancella_foto_selezionate())
+        self.root.bind("<Delete>", lambda e: self._safe_action(self.cancella_foto_selezionate))
+        self.root.bind("<BackSpace>", lambda e: self._safe_action(self.cancella_foto_selezionate))
 
         ctrl = "Command" if sys.platform == "darwin" else "Control"
         self.root.bind(f"<{ctrl}-s>", lambda e: self.salva_ordine())
         self.root.bind(f"<{ctrl}-S>", lambda e: self.salva_ordine())
-        self.root.bind(f"<{ctrl}-o>", lambda e: self.carica_foto_multiple())
-        self.root.bind(f"<{ctrl}-O>", lambda e: self.carica_foto_multiple())
-        self.root.bind(f"<{ctrl}-a>", lambda e: self.seleziona_tutto())
-        self.root.bind(f"<{ctrl}-A>", lambda e: self.seleziona_tutto())
+        self.root.bind(f"<{ctrl}-o>", lambda e: self._safe_action(self.carica_foto_multiple))
+        self.root.bind(f"<{ctrl}-O>", lambda e: self._safe_action(self.carica_foto_multiple))
+        self.root.bind(f"<{ctrl}-a>", lambda e: self._safe_action(self.seleziona_tutto))
+        self.root.bind(f"<{ctrl}-A>", lambda e: self._safe_action(self.seleziona_tutto))
 
     # -------------------------------------------------------------------------
     # Formato e Ritaglio

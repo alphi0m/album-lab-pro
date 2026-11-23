@@ -89,6 +89,8 @@ class ServerStorage:
                         data = json.load(f)
                         data["_folder"] = str(folder)
                         data["totale_file"] = len(data.get("file_ricevuti", []))
+                        data["order_id"] = data.get("order_id") or folder.name
+                        data["stato"] = str(data.get("stato") or "IN ATTESA").strip().upper()
                         ordini.append(data)
                 except Exception as e:
                     print(f"Errore lettura {json_path}: {e}")
@@ -114,11 +116,14 @@ class ServerStorage:
 
     @classmethod
     def aggiorna_stato(cls, order_id: str, nuovo_stato: str) -> bool:
+        clean_status = str(nuovo_stato).strip().upper()
+        if not clean_status:
+            return False
+
         ordine = cls.get_ordine(order_id)
         if not ordine:
             return False
 
-        clean_status = str(nuovo_stato).strip().upper()
         ordine["stato"] = clean_status
         ordine["ultimo_aggiornamento"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 

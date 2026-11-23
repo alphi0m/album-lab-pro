@@ -186,10 +186,10 @@ DASHBOARD_HTML = """
                         </td>
                         <td>
                             <select class="status-select" data-current="{{ o.stato }}" onchange="aggiornaStato(this, '{{ o.order_id }}')">
-                                <option value="IN ATTESA" {% if o.stato|upper|trim == 'IN ATTESA' %}selected{% endif %}>🟡 In Attesa</option>
-                                <option value="IN STAMPA" {% if o.stato|upper|trim == 'IN STAMPA' %}selected{% endif %}>🔵 In Stampa</option>
-                                <option value="IN LEGATORIA" {% if o.stato|upper|trim == 'IN LEGATORIA' %}selected{% endif %}>🟣 In Legatoria</option>
-                                <option value="PRONTO" {% if o.stato|upper|trim == 'PRONTO' %}selected{% endif %}>🟢 Pronto / Spedito</option>
+                                <option value="IN ATTESA" {% if o.stato == 'IN ATTESA' %}selected{% endif %}>🟡 In Attesa</option>
+                                <option value="IN STAMPA" {% if o.stato == 'IN STAMPA' %}selected{% endif %}>🔵 In Stampa</option>
+                                <option value="IN LEGATORIA" {% if o.stato == 'IN LEGATORIA' %}selected{% endif %}>🟣 In Legatoria</option>
+                                <option value="PRONTO" {% if o.stato == 'PRONTO' %}selected{% endif %}>🟢 Pronto / Spedito</option>
                             </select>
                         </td>
                         <td>
@@ -234,21 +234,21 @@ DASHBOARD_HTML = """
             setTimeout(() => { toast.style.display = 'none'; }, 2500);
         }
 
-        function aggiornaStato(selectElem, orderId) {
+        async function aggiornaStato(selectElem, orderId) {
             const vecchioStato = selectElem.getAttribute('data-current') || selectElem.value;
             const nuovoStato = selectElem.value;
-            selectElem.disabled = true;
+            selectElem.style.opacity = '0.5';
             resetReloadTimer();
 
-            fetch(`/api/orders/${orderId}/status`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ stato: nuovoStato })
-            })
-            .then(res => res.json())
-            .then(data => {
-                selectElem.disabled = false;
-                if(data.success) {
+            try {
+                const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}/status`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ stato: nuovoStato })
+                });
+                const data = await res.json();
+                selectElem.style.opacity = '1.0';
+                if(data && data.success) {
                     selectElem.setAttribute('data-current', nuovoStato);
                     selectElem.style.borderColor = '#2ECC71';
                     showToast(`✓ Stato aggiornato: ${nuovoStato}`);
@@ -257,12 +257,12 @@ DASHBOARD_HTML = """
                     selectElem.value = vecchioStato;
                     showToast('Errore durante il salvataggio!', true);
                 }
-            })
-            .catch(err => {
-                selectElem.disabled = false;
+            } catch (err) {
+                console.error("Errore aggiornaStato:", err);
+                selectElem.style.opacity = '1.0';
                 selectElem.value = vecchioStato;
                 showToast('Errore di connessione!', true);
-            });
+            }
         }
 
         function eliminaOrdine(orderId) {
@@ -477,13 +477,25 @@ def api_post_order():
         }), 500
 
 
-@app.route("/api/orders/<order_id>/status", methods=["POST"])
+@app.route("/api/orders/<order_id>/status", methods=["GET", "POST"])
 def api_update_status(order_id):
-    """Aggiorna lo stato di lavorazione dell'ordine (IN STAMPA, IN LEGATORIA, PRONTO)."""
-    data = request.get_json() or {}
-    nuovo_stato = data.get("stato", "")
-    ok = ServerStorage.aggiorna_stato(order_id, nuovo_stato)
-    return jsonify({"success": ok})
+    """Aggiorna lo stato di lavorazione dell'ordine (IN ATTESA, IN STAMPA, IN LEGATORIA, PRONTO)."""
+    nuovo_stato = ""
+    if request.is_json:
+        try:
+            data = request.get_json(force=True, silent=True) or {}
+            nuovo_stato = data.get("stato", "")
+        except Exception:
+            pass
+    if not nuovo_stato:
+        nuovo_stato = request.form.get("stato") or request.args.get("stato") or ""
+
+    clean_stato = str(nuovo_stato).strip().upper()
+    if not clean_stato:
+        return jsonify({"success": False, "error": "Parametro 'stato' mancante o non valido"}), 400
+
+    ok = ServerStorage.aggiorna_stato(order_id, clean_stato)
+    return jsonify({"success": ok, "stato": clean_stato})
 
 
 @app.route("/api/orders/<order_id>/download", methods=["GET"])
