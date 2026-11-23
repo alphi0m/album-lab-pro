@@ -232,7 +232,7 @@ class MainApp:
         self.right_outer = ttk.Frame(main_pane, width=410, style="Card.TFrame")
         self.right_outer.pack_propagate(False)
 
-        self.right_canvas = tk.Canvas(self.right_outer, bg=BG_APP, highlightthickness=0)
+        self.right_canvas = tk.Canvas(self.right_outer, bg=BG_APP, highlightthickness=0, yscrollincrement=5)
         self.right_scrollbar = ttk.Scrollbar(self.right_outer, orient="vertical", command=self.right_canvas.yview)
         self.right_canvas.configure(yscrollcommand=self.right_scrollbar.set)
 
@@ -336,6 +336,15 @@ class MainApp:
 
     def _setup_mousewheel(self):
         """Gestore unificato e fluido della rotellina del mouse senza conflitti enter/leave."""
+        # Disabilita il cambio valore accidentale su tutti i Combobox e Spinbox durante lo scroll
+        for cls in ("TCombobox", "Combobox", "TSpinbox", "Spinbox"):
+            try:
+                self.root.unbind_class(cls, "<MouseWheel>")
+                self.root.unbind_class(cls, "<Button-4>")
+                self.root.unbind_class(cls, "<Button-5>")
+            except Exception:
+                pass
+
         def _on_global_mousewheel(event):
             try:
                 w = self.root.winfo_containing(event.x_root, event.y_root)
@@ -346,13 +355,27 @@ class MainApp:
                 if isinstance(w, tk.Text):
                     return
 
+                # Calcolo della direzione e intensità dello scorrimento (calibrato morbido per Mac e Windows)
                 delta = 0
                 if hasattr(event, "delta") and event.delta != 0:
-                    delta = -1 if event.delta > 0 else 1
+                    if sys.platform == "darwin":
+                        # Su macOS il trackpad emette decine di micro-eventi delta (±1, ±2).
+                        # Limitiamo a max 3 unità (15px) per evento con yscrollincrement=5 per uno scorrimento
+                        # morbido, vellutato e senza salti improvvisi.
+                        if abs(event.delta) >= 120:
+                            delta = -1 * int(event.delta / 120) * 3
+                        else:
+                            delta = -1 * max(min(int(event.delta), 3), -3)
+                    else:
+                        # Windows rotellina fisica standard (±120)
+                        if abs(event.delta) >= 120:
+                            delta = -1 * int(event.delta / 120) * 3
+                        else:
+                            delta = -1 if event.delta > 0 else 1
                 elif event.num == 4:
-                    delta = -1
+                    delta = -2
                 elif event.num == 5:
-                    delta = 1
+                    delta = 2
 
                 if delta == 0:
                     return
@@ -371,9 +394,9 @@ class MainApp:
                     curr = getattr(curr, "master", None)
 
                 if is_right and hasattr(self, "right_canvas"):
-                    self.right_canvas.yview_scroll(delta * 2, "units")
+                    self.right_canvas.yview_scroll(delta, "units")
                 elif is_thumbs and hasattr(self, "miniature_panel"):
-                    self.miniature_panel.canvas.yview_scroll(delta * 2, "units")
+                    self.miniature_panel.canvas.yview_scroll(delta, "units")
             except Exception:
                 pass
 

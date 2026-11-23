@@ -64,7 +64,7 @@ class MiniaturePanel(tk.Frame):
         self.container = tk.Frame(self, bg=BG_APP)
         self.container.pack(fill="both", expand=True)
 
-        self.canvas = tk.Canvas(self.container, bg=BG_APP, highlightthickness=0)
+        self.canvas = tk.Canvas(self.container, bg=BG_APP, highlightthickness=0, yscrollincrement=5)
         self.scrollbar = ttk.Scrollbar(self.container, orient="vertical", command=self.canvas.yview)
         self.canvas.configure(yscrollcommand=self.scrollbar.set)
 

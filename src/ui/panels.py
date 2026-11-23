@@ -300,8 +300,8 @@ class MaterialiPanel(ttk.LabelFrame):
         self.main_app = main_app
         self.modalita = MODO_ALBUM
 
-        # Variabili album
-        self.tipo_carta_album_var = tk.StringVar(value="Carta Lucida")
+        # Variabili album (Limitate alle carte fisiche di laboratorio: Lucida, Satinata, Seta)
+        self.tipo_carta_album_var = tk.StringVar(value=CARTA_FOTO_DEFAULT)
         self.collezione_var = tk.StringVar()
         self.colore_var = tk.StringVar()
 
@@ -320,7 +320,7 @@ class MaterialiPanel(ttk.LabelFrame):
         combo_carta = ttk.Combobox(
             row_carta,
             textvariable=self.tipo_carta_album_var,
-            values=["Carta Lucida", "Satinata / Opaca", "Tela Fine Art", "Metallic / Silk", "Velvet HD"],
+            values=CARTE_FOTO,
             state="readonly"
         )
         combo_carta.pack(side="right", fill="x", expand=True)
