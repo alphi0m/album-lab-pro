@@ -1,0 +1,11 @@
+{
+    "101": {
+        "codice": "101",
+        "nome_studio": "Foto Studio Demo",
+        "pin": "1234",
+        "titolare": "Marco Rossi",
+        "telefono": "333 1234567",
+        "data_registrazione": "2026-11-23",
+        "attivo": true
+    }
+}

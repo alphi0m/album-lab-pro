@@ -272,7 +272,17 @@ class StoricoOrdiniWindow(tk.Toplevel):
         ).pack(side="left")
 
     def _richiedi_login(self):
-        AuthStudioDialog(self, self.config_mgr, on_success=self.aggiorna_ordini)
+        AuthStudioDialog(self, self.config_mgr, on_success=self._on_login_success)
+
+    def _on_login_success(self):
+        if self.main_app and hasattr(self.main_app, "info_panel"):
+            cod = self.config_mgr.get("codice_cliente", "")
+            nome = self.config_mgr.get("nome_studio", "")
+            if cod:
+                self.main_app.info_panel.codice_cliente_var.set(cod)
+            if nome and not self.main_app.info_panel.nome_cliente_var.get().strip():
+                self.main_app.info_panel.nome_cliente_var.set(nome)
+        self.aggiorna_ordini()
 
     def aggiorna_ordini(self):
         """Scarica lo stato degli ordini dal server per lo studio autenticato."""

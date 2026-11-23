@@ -538,6 +538,18 @@ class MainApp:
         dati_commessa = self.info_panel.get_data()
         num_busta = dati_commessa["num_busta"]
 
+        # Fallback automatico se codice/nome cliente non compilati a mano nel pannello
+        if not dati_commessa.get("codice_cliente"):
+            cod = self.config_mgr.get("codice_cliente", "")
+            if cod:
+                dati_commessa["codice_cliente"] = cod
+                self.info_panel.codice_cliente_var.set(cod)
+        if not dati_commessa.get("nome_cliente"):
+            nome = self.config_mgr.get("nome_studio", "")
+            if nome:
+                dati_commessa["nome_cliente"] = nome
+                self.info_panel.nome_cliente_var.set(nome)
+
         # Controllo conflitti numero busta prima del salvataggio
         if self.config_mgr.is_busta_in_conflitto(num_busta):
             prossimo = self.config_mgr.trova_prossimo_num_busta()
@@ -610,6 +622,18 @@ class MainApp:
 
         dati_commessa = self.info_panel.get_data()
         num_busta = dati_commessa["num_busta"]
+
+        # Fallback automatico se codice/nome cliente non compilati a mano nel pannello
+        if not dati_commessa.get("codice_cliente"):
+            cod = self.config_mgr.get("codice_cliente", "")
+            if cod:
+                dati_commessa["codice_cliente"] = cod
+                self.info_panel.codice_cliente_var.set(cod)
+        if not dati_commessa.get("nome_cliente"):
+            nome = self.config_mgr.get("nome_studio", "")
+            if nome:
+                dati_commessa["nome_cliente"] = nome
+                self.info_panel.nome_cliente_var.set(nome)
 
         # Controllo conflitti numero busta
         if self.config_mgr.is_busta_in_conflitto(num_busta):
